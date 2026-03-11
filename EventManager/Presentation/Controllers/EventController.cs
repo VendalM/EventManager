@@ -40,7 +40,12 @@ public class EventController : ControllerBase
 
         if (desiredEvent == null)
         {
-            return NotFound();   
+            return NotFound(new ProblemDetails
+            {
+                Title = "Событие не найдено",
+                Detail = $"Событие с id {id} не существует",
+                Status = StatusCodes.Status404NotFound
+            }); 
         }
     
         return Ok(desiredEvent);
@@ -54,13 +59,13 @@ public class EventController : ControllerBase
     {
         if (!ModelState.IsValid)
         {
-            return BadRequest(ModelState);
+            return ValidationProblem(ModelState);
         }
         
         if (value.StartDate >= value.EndDate)
         {
             ModelState.AddModelError("EndDate", "Дата окончания события должна быть больше даты начала.");
-            return BadRequest(ModelState);
+            return ValidationProblem(ModelState);
         }
         
         var createdEvent = _eventService.Create(value);
@@ -76,13 +81,13 @@ public class EventController : ControllerBase
     {
         if (!ModelState.IsValid)
         {
-            return BadRequest(ModelState);
+            return ValidationProblem(ModelState);
         }
         
         if (updatedEvent.StartDate >= updatedEvent.EndDate)
         {
             ModelState.AddModelError("EndDate", "Дата окончания события должна быть больше даты начала.");
-            return BadRequest(ModelState);
+            return ValidationProblem(ModelState);
         }
         
         var result = _eventService.Update(id, updatedEvent);
@@ -106,6 +111,11 @@ public class EventController : ControllerBase
             return NoContent();
         }
 
-        return NotFound();
+        return NotFound(new ProblemDetails
+        {
+            Title = "Событие не найдено",
+            Detail = $"Событие с id {id} не существует",
+            Status = StatusCodes.Status404NotFound
+        });
     }
 }

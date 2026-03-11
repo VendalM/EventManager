@@ -29,10 +29,17 @@ public class EventService : IEventService
     /// <inheritdoc />
     public EventDto Create(EventSaveDto newEvent)
     {
-        newEvent.Id = GenerateNewId();
+        var entity = new EventDto()
+        {
+            Id = GenerateNewId(),
+            Title = newEvent.Title,
+            Description = newEvent.Description,
+            StartDate = newEvent.StartDate,
+            EndDate = newEvent.EndDate,
+        };
     
-        Events.Add(newEvent);
-        return newEvent;
+        Events.Add(entity);
+        return entity;
     }
     
     /// <inheritdoc />

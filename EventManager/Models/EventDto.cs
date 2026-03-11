@@ -10,13 +10,11 @@ public class EventDto
     /// <summary>
     /// Идентификатор
     /// </summary>
-    [Required]
     public int Id { get; set; }
     
     /// <summary>
     /// Заголовок события
     /// </summary>
-    [Required]
     public string Title { get; set; }
     
     /// <summary>
@@ -27,12 +25,10 @@ public class EventDto
     /// <summary>
     /// Время начала события
     /// </summary>
-    [Required]
     public DateTime StartDate { get; set; }
     
     /// <summary>
     /// Время конца события
     /// </summary>
-    [Required]
     public DateTime EndDate { get; set; }
 }
