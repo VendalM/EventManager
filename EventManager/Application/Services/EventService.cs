@@ -3,21 +3,31 @@ using EventManager.Models;
 
 namespace EventManager.Application.Services;
 
+/// <summary>
+/// Сервис для обработки событий
+/// </summary>
 public class EventService : IEventService
 {
-    private static List<Event> Events { get; set; } = new List<Event>();
+    /// <summary>
+    /// Все доступные события
+    /// </summary>
+    private static List<EventDto> Events { get; set; } = new List<EventDto>();
     
-    public List<Event> GetAllEvents()
+    
+    /// <inheritdoc />
+    public List<EventDto> GetAllEvents()
     {
         return Events;
     }
     
-    public Event? GetById(int id)
+    /// <inheritdoc />
+    public EventDto? GetById(int id)
     {
         return Events.FirstOrDefault(e => e.Id == id);
     }
     
-    public Event Create(Event newEvent)
+    /// <inheritdoc />
+    public EventDto Create(EventSaveDto newEvent)
     {
         newEvent.Id = GenerateNewId();
     
@@ -25,26 +35,32 @@ public class EventService : IEventService
         return newEvent;
     }
     
-    public bool Update(int id, Event updatedEvent)
+    /// <inheritdoc />
+    public EventDto? Update(int id, EventSaveDto updatedEvent)
     {
         var existingEvent = Events.FirstOrDefault(e => e.Id == id);
     
         if (existingEvent == null)
-            return false;
+            return null;
 
         existingEvent.Title = updatedEvent.Title;
         existingEvent.Description = updatedEvent.Description;
         existingEvent.StartDate = updatedEvent.StartDate;
         existingEvent.EndDate = updatedEvent.EndDate;
     
-        return true;
+        return existingEvent;
     }
     
+    /// <inheritdoc />
     public bool Delete(int id)
     {
         return Events.RemoveAll(e => e.Id == id) > 0;
     }
     
+    /// <summary>
+    /// Генерация идентификатора события
+    /// </summary>
+    /// <returns>Новый идентификатор</returns>
     private int GenerateNewId()
     {
         return Events.Any() ? Events.Max(e => e.Id) + 1 : 1;

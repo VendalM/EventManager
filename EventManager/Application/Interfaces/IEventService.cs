@@ -2,15 +2,43 @@ using EventManager.Models;
 
 namespace EventManager.Application.Interfaces;
 
+/// <summary>
+/// Контракт для логики сервиса обработки событий
+/// </summary>
 public interface IEventService
 {
-    public List<Event> GetAllEvents();
+    /// <summary>
+    /// Получить все доступные события
+    /// </summary>
+    /// <returns>События</returns>
+    public List<EventDto> GetAllEvents();
 
-    public Event? GetById(int id);
+    /// <summary>
+    /// Получить событие по идентификатору
+    /// </summary>
+    /// <param name="id">Идентификатор</param>
+    /// <returns>Найденное событие</returns>
+    public EventDto? GetById(int id);
 
-    public Event Create(Event newEvent);
+    /// <summary>
+    /// Создать событие
+    /// </summary>
+    /// <param name="newEvent">Новое событие</param>
+    /// <returns>Созданное событие</returns>
+    public EventDto Create(EventSaveDto newEvent);
 
-    public bool Update(int id, Event updatedEvent);
+    /// <summary>
+    /// Обновить событие
+    /// </summary>
+    /// <param name="id">Идентификатор</param>
+    /// <param name="updatedEvent">Обновляемое событие</param>
+    /// <returns>Удалось ли обновить событие?</returns>
+    public EventDto? Update(int id, EventSaveDto updatedEvent);
 
+    /// <summary>
+    /// Удалить событие
+    /// </summary>
+    /// <param name="id">Идентификатор</param>
+    /// <returns>Удалось ли удалить событие?</returns>
     public bool Delete(int id);
 }

@@ -4,25 +4,37 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace EventManager.Presentation.Controllers;
 
+/// <summary>
+/// Контроллер для работы с событиями
+/// </summary>
 [ApiController]
 [Route("api/[controller]")]
 public class EventController : ControllerBase
 {
     private readonly IEventService _eventService;
 
-    EventController(IEventService eventService)
+    /// <summary>
+    /// Создание экземпляра класса <see cref="EventController"/>.
+    /// </summary>
+    public EventController(IEventService eventService)
     {
         _eventService = eventService;
     }
     
+    /// <summary>
+    /// Получить все события
+    /// </summary>
     [HttpGet]
-    public ActionResult<List<Event>> GetAllEvents()
+    public ActionResult<List<EventDto>> GetAllEvents()
     {
         return _eventService.GetAllEvents();
     }
     
+    /// <summary>
+    /// Получить событие по идентификатору
+    /// </summary>
     [HttpGet("{id:int}")]
-    public ActionResult<Event> GetById(int id)
+    public ActionResult<EventDto> GetById(int id)
     {
         var desiredEvent = _eventService.GetById(id);
 
@@ -34,8 +46,11 @@ public class EventController : ControllerBase
         return Ok(desiredEvent);
     }
     
+    /// <summary>
+    /// Создает новое событие
+    /// </summary>
     [HttpPost]
-    public IActionResult Create([FromBody] Event value)
+    public ActionResult<EventDto> Create([FromBody] EventSaveDto value)
     {
         if (!ModelState.IsValid)
         {
@@ -53,8 +68,11 @@ public class EventController : ControllerBase
         return CreatedAtAction(nameof(GetById), new { id = createdEvent.Id }, createdEvent);
     }
     
+    /// <summary>
+    /// Редактирует существующее событие
+    /// </summary>
     [HttpPut("{id}")]
-    public IActionResult Update(int id,[FromBody] Event updatedEvent)
+    public ActionResult<EventDto> Update(int id,[FromBody] EventSaveDto updatedEvent)
     {
         if (!ModelState.IsValid)
         {
@@ -69,14 +87,17 @@ public class EventController : ControllerBase
         
         var result = _eventService.Update(id, updatedEvent);
 
-        if (result)
+        if (result != null)
         {
-            return NoContent();
+            return CreatedAtAction(nameof(GetById), new { id = result.Id }, result);
         }
         
         return NotFound();   
     }
     
+    /// <summary>
+    /// Удаление
+    /// </summary>
     [HttpDelete("{id:int}")]
     public IActionResult Delete(int id)
     {

@@ -5,7 +5,7 @@ namespace EventManager.Models;
 /// <summary>
 /// Базовый класс события
 /// </summary>
-public class Event
+public class EventDto
 {
     /// <summary>
     /// Идентификатор
