@@ -1,0 +1,17 @@
+﻿# Rider
+.idea/
+*.sln.iml
+*.user
+*.userosscache
+*.suo
+*.userprefs
+
+# Visual Studio
+.vs/
+*.swp
+*._*
+*.sln.docstates
+
+# Build results
+[Bb]in/
+[Oo]bj/
