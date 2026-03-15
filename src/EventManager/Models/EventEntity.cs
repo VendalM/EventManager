@@ -1,16 +1,18 @@
-using System.ComponentModel.DataAnnotations;
-
 namespace EventManager.Models;
 
 /// <summary>
-/// Модель сохранения события
+/// Сущность события для хранения в БД
 /// </summary>
-public class EventSaveDto
+public class EventEntity
 {
+    /// <summary>
+    /// Идентификатор
+    /// </summary>
+    public int Id { get; set; }
+    
     /// <summary>
     /// Заголовок события
     /// </summary>
-    [Required(AllowEmptyStrings = false, ErrorMessage = "Не заполнен заголовок события")]
     public string Title { get; set; }
     
     /// <summary>
@@ -21,12 +23,10 @@ public class EventSaveDto
     /// <summary>
     /// Время начала события
     /// </summary>
-    [Required(ErrorMessage = "Не указано время начала события")]
     public DateTime StartDate { get; set; }
     
     /// <summary>
     /// Время конца события
     /// </summary>
-    [Required(ErrorMessage = "Не указано время окончания события")]
     public DateTime EndDate { get; set; }
 }

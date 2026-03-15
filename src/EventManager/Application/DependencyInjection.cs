@@ -1,5 +1,6 @@
 using EventManager.Application.Interfaces;
 using EventManager.Application.Services;
+using EventManager.Mappers;
 
 namespace EventManager.Application
 {
@@ -17,6 +18,9 @@ namespace EventManager.Application
         {
             // Бизнес-логика
             services.AddScoped<IEventService, EventService>();
+            
+            // Регистрация AutoMapper
+            services.AddAutoMapper(typeof(EventMappingProfile).Assembly);
 
             return services;
         }

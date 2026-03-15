@@ -8,7 +8,7 @@ namespace EventManager.Presentation.Controllers;
 /// Контроллер для работы с событиями
 /// </summary>
 [ApiController]
-[Route("api/[controller]")]
+[Route("api/event")]
 public class EventController : ControllerBase
 {
     private readonly IEventService _eventService;
@@ -59,12 +59,6 @@ public class EventController : ControllerBase
     {
         if (!ModelState.IsValid)
         {
-            return ValidationProblem(ModelState);
-        }
-        
-        if (value.StartDate >= value.EndDate)
-        {
-            ModelState.AddModelError("EndDate", "Дата окончания события должна быть больше даты начала.");
             return ValidationProblem(ModelState);
         }
         
