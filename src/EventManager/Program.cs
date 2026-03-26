@@ -1,6 +1,8 @@
 using System.Globalization;
 using EventManager.Application;
+using EventManager.Middlewares;
 using EventManager.Presentation;
+using Microsoft.AspNetCore.Mvc;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -19,8 +21,13 @@ if (builder.Environment.IsDevelopment())
         options.ValidateOnBuild = true;
     });
 }
+builder.Services.Configure<ApiBehaviorOptions>(options =>
+{
+    options.SuppressModelStateInvalidFilter = true;
+});
 
 var app = builder.Build();
+app.UseGlobalExceptionHandling();
 
 if (app.Environment.IsDevelopment())
 {

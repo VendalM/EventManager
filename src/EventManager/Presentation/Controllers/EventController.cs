@@ -1,4 +1,5 @@
 using EventManager.Application.Interfaces;
+using EventManager.Exceptions;
 using EventManager.Models;
 using Microsoft.AspNetCore.Mvc;
 
@@ -8,7 +9,7 @@ namespace EventManager.Presentation.Controllers;
 /// Контроллер для работы с событиями
 /// </summary>
 [ApiController]
-[Route("api/event")]
+[Route("/events")]
 public class EventController : ControllerBase
 {
     private readonly IEventService _eventService;
@@ -40,12 +41,7 @@ public class EventController : ControllerBase
 
         if (desiredEvent == null)
         {
-            return NotFound(new ProblemDetails
-            {
-                Title = "Событие не найдено",
-                Detail = $"Событие с id {id} не существует",
-                Status = StatusCodes.Status404NotFound
-            }); 
+            throw new NotFoundException(id);
         }
     
         return Ok(desiredEvent);
@@ -57,11 +53,6 @@ public class EventController : ControllerBase
     [HttpPost]
     public ActionResult<EventDto> Create([FromBody] EventSaveDto value)
     {
-        if (!ModelState.IsValid)
-        {
-            return ValidationProblem(ModelState);
-        }
-        
         var createdEvent = _eventService.Create(value);
         
         return CreatedAtAction(nameof(GetById), new { id = createdEvent.Id }, createdEvent);
@@ -73,15 +64,9 @@ public class EventController : ControllerBase
     [HttpPut("{id}")]
     public ActionResult<EventDto> Update(int id,[FromBody] EventSaveDto updatedEvent)
     {
-        if (!ModelState.IsValid)
-        {
-            return ValidationProblem(ModelState);
-        }
-        
         if (updatedEvent.StartDate >= updatedEvent.EndDate)
         {
-            ModelState.AddModelError("EndDate", "Дата окончания события должна быть больше даты начала.");
-            return ValidationProblem(ModelState);
+            throw new ValidationException("Дата окончания события должна быть больше даты начала.");
         }
         
         var result = _eventService.Update(id, updatedEvent);
@@ -91,7 +76,7 @@ public class EventController : ControllerBase
             return CreatedAtAction(nameof(GetById), new { id = result.Id }, result);
         }
         
-        return NotFound();   
+        throw new NotFoundException(id);
     }
     
     /// <summary>
@@ -105,11 +90,6 @@ public class EventController : ControllerBase
             return NoContent();
         }
 
-        return NotFound(new ProblemDetails
-        {
-            Title = "Событие не найдено",
-            Detail = $"Событие с id {id} не существует",
-            Status = StatusCodes.Status404NotFound
-        });
+        throw new NotFoundException(id);
     }
 }
