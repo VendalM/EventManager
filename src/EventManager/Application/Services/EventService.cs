@@ -26,7 +26,7 @@ public class EventService : IEventService
     }
     
     /// <inheritdoc />
-    public List<EventDto> GetAllEvents(string? title, DateTime? from, DateTime? to)
+    public PaginatedResult<EventDto> GetAllEvents(string? title, DateTime? from, DateTime? to, int page = 1, int pageSize = 10)
     {
         var query = Events.AsQueryable();
         
@@ -45,8 +45,20 @@ public class EventService : IEventService
             query = query.Where(e => e.EndDate <= to.Value);
         }
         
-        var entities = query.ToList();
-        return _mapper.Map<List<EventDto>>(entities);
+        var totalItems = query.Count();
+        
+        var items = query
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToList();
+        
+        return new PaginatedResult<EventDto>()
+        {
+            Page = page,
+            PageSize = pageSize,
+            TotalItems = totalItems,
+            Items = _mapper.Map<List<EventDto>>(items)
+        };
     }
     
     /// <inheritdoc />

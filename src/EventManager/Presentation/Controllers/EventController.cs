@@ -28,10 +28,12 @@ public class EventController : ControllerBase
     /// @param title Фильтр по названию события (необязательный)
     /// @param from Фильтр по дате начала события (необязательный)
     /// @param to Фильтр по дате окончания события (необязательный)
+    /// @param page Номер страницы для пагинации (по умолчанию 1)
+    /// @param pageSize Количество элементов на странице для пагинации (по умолчанию 10)
     [HttpGet]
-    public ActionResult<List<EventDto>> GetAllEvents(string? title, DateTime? from, DateTime? to)
+    public ActionResult<PaginatedResult<EventDto>> GetAllEvents(string? title, DateTime? from, DateTime? to, int page = 1, int pageSize = 10)
     {
-        return _eventService.GetAllEvents(title, from, to);
+        return _eventService.GetAllEvents(title, from, to, page, pageSize);
     }
     
     /// <summary>
