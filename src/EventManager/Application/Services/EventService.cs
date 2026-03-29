@@ -26,9 +26,26 @@ public class EventService : IEventService
     }
     
     /// <inheritdoc />
-    public List<EventDto> GetAllEvents()
+    public List<EventDto> GetAllEvents(string? title, DateTime? from, DateTime? to)
     {
-        var entities = Events;
+        var query = Events.AsQueryable();
+        
+        if (!string.IsNullOrEmpty(title))
+        {
+            query = query.Where(e => e.Title.Contains(title, StringComparison.OrdinalIgnoreCase));
+        }
+    
+        if (from.HasValue)
+        {
+            query = query.Where(e => e.StartDate >= from.Value);
+        }
+    
+        if (to.HasValue)
+        {
+            query = query.Where(e => e.EndDate <= to.Value);
+        }
+        
+        var entities = query.ToList();
         return _mapper.Map<List<EventDto>>(entities);
     }
     

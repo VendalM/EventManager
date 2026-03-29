@@ -25,10 +25,13 @@ public class EventController : ControllerBase
     /// <summary>
     /// Получить все события
     /// </summary>
+    /// @param title Фильтр по названию события (необязательный)
+    /// @param from Фильтр по дате начала события (необязательный)
+    /// @param to Фильтр по дате окончания события (необязательный)
     [HttpGet]
-    public ActionResult<List<EventDto>> GetAllEvents()
+    public ActionResult<List<EventDto>> GetAllEvents(string? title, DateTime? from, DateTime? to)
     {
-        return _eventService.GetAllEvents();
+        return _eventService.GetAllEvents(title, from, to);
     }
     
     /// <summary>
