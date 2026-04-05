@@ -1,4 +1,5 @@
 using System.Reflection;
+using EventManager.Filters;
 
 namespace EventManager.Presentation
 {
@@ -22,15 +23,18 @@ namespace EventManager.Presentation
         /// </remarks>
         public static IServiceCollection AddPresentation(this IServiceCollection services)
         {
-            services.AddControllers();
+            services.AddControllers(options =>
+            {
+                options.Filters.Add<ValidationExceptionFilter>();
+            });
+            
             services.AddEndpointsApiExplorer();
             services.AddSwaggerGen(options =>
             {
-                // Путь к XML-файлу с документацией
                 var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
                 var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
                 options.IncludeXmlComments(xmlPath);
-            }); 
+            });
 
             return services;
         }

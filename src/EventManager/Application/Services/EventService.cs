@@ -26,10 +26,39 @@ public class EventService : IEventService
     }
     
     /// <inheritdoc />
-    public List<EventDto> GetAllEvents()
+    public PaginatedResult<EventDto> GetAllEvents(string? title, DateTime? from, DateTime? to, int page = 1, int pageSize = 10)
     {
-        var entities = Events;
-        return _mapper.Map<List<EventDto>>(entities);
+        var query = Events.AsQueryable();
+        
+        if (!string.IsNullOrEmpty(title))
+        {
+            query = query.Where(e => e.Title.Contains(title, StringComparison.OrdinalIgnoreCase));
+        }
+    
+        if (from.HasValue)
+        {
+            query = query.Where(e => e.StartDate >= from.Value);
+        }
+    
+        if (to.HasValue)
+        {
+            query = query.Where(e => e.EndDate <= to.Value);
+        }
+        
+        var totalItems = query.Count();
+        
+        var items = query
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToList();
+        
+        return new PaginatedResult<EventDto>()
+        {
+            Page = page,
+            PageSize = pageSize,
+            TotalItems = totalItems,
+            Items = _mapper.Map<List<EventDto>>(items)
+        };
     }
     
     /// <inheritdoc />
