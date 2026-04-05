@@ -11,4 +11,11 @@ public class NotFoundException : Exception
     public NotFoundException(int id) : base($"Сущность с идентификатором '{id}' не найдена.")
     {
     }
+    
+    /// <summary>
+    /// Сообщение об ошибке, указывающее на то, что сущность с указанным идентификатором не найдена
+    /// </summary>
+    public NotFoundException(Guid id) : base($"Сущность с идентификатором '{id}' не найдена.")
+    {
+    }
 }

@@ -101,6 +101,12 @@ public class EventService : IEventService
         return Events.RemoveAll(e => e.Id == id) > 0;
     }
     
+    /// <inheritdoc />
+    public bool HasEvent(int id)
+    {
+        return Events.Any(e => e.Id == id);
+    }
+    
     /// <summary>
     /// Генерация идентификатора события
     /// </summary>

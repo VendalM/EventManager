@@ -13,13 +13,15 @@ namespace EventManager.Presentation.Controllers;
 public class EventController : ControllerBase
 {
     private readonly IEventService _eventService;
+    private readonly IBookingService _bookingService;
 
     /// <summary>
     /// Создание экземпляра класса <see cref="EventController"/>.
     /// </summary>
-    public EventController(IEventService eventService)
+    public EventController(IEventService eventService, IBookingService bookingService)
     {
         _eventService = eventService;
+        _bookingService = bookingService;
     }
     
     /// <summary>
@@ -82,6 +84,29 @@ public class EventController : ControllerBase
         }
         
         throw new NotFoundException(id);
+    }
+    
+    /// <summary>
+    /// Создать бронь для события
+    /// </summary>
+    [HttpPost("/events/{id}/book")]
+    public async Task<IActionResult> CreateBooking(int id)
+    {
+        if (!_eventService.HasEvent(id))
+        {
+            throw new NotFoundException(id);
+        }
+        
+        var result = await _bookingService.CreateBookingAsync(id);
+        
+        if (result == null)
+        {
+            throw new NotFoundException(id);
+        }
+
+        HttpContext.Response.Headers.Location = $"/bookings/{result.Id}";
+        
+        return StatusCode(202, result);
     }
     
     /// <summary>

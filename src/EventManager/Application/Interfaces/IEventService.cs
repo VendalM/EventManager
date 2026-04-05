@@ -46,4 +46,10 @@ public interface IEventService
     /// <param name="id">Идентификатор</param>
     /// <returns>Удалось ли удалить событие?</returns>
     public bool Delete(int id);
+    
+    /// <summary>
+    /// Проверить, существует ли событие с данным идентификатором
+    /// </summary>
+    /// <param name="id">Идентификатор</param>
+    public bool HasEvent(int id);
 }
