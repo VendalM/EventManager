@@ -18,6 +18,7 @@ namespace EventManager.Application
         {
             // Бизнес-логика
             services.AddScoped<IEventService, EventService>();
+            services.AddScoped<IBookingService, BookingService>();
             
             // Регистрация AutoMapper
             services.AddAutoMapper(typeof(EventMappingProfile).Assembly);
