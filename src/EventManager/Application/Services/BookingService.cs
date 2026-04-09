@@ -10,19 +10,21 @@ namespace EventManager.Application.Services;
 /// </summary>
 public class BookingService : IBookingService
 {
-    private static List<BookingEntity> Booking { get; set; } = new();
     private readonly IMapper _mapper;
     private readonly IEventService _eventService;
+    private readonly IBookingRepository _bookingRepository;
     
     /// <summary>
     /// Конструктор, который принимает зависимости для работы сервиса бронирования
     /// </summary>
     /// <param name="mapper">Экземпляр AutoMapper для преобразования между сущностями и DTO</param>
     /// <param name="eventService">Экземпляр сервиса событий для проверки существования события перед созданием брони</param>
-    public BookingService(IMapper mapper, IEventService eventService)
+    /// <param name="bookingRepository">Экземпляр репозитория бронирования для доступа к данным бронирования</param>
+    public BookingService(IMapper mapper, IEventService eventService, IBookingRepository bookingRepository)
     {
         _mapper = mapper;
         _eventService = eventService;
+        _bookingRepository = bookingRepository;
     }
     
     /// <inheritdoc />
@@ -41,7 +43,7 @@ public class BookingService : IBookingService
             CreatedAt = DateTime.Now
         };
         
-        Booking.Add(entity);
+        await _bookingRepository.AddAsync(entity);
         
         return await Task.FromResult(_mapper.Map<BookingDto>(entity));
     }
@@ -49,7 +51,7 @@ public class BookingService : IBookingService
     /// <inheritdoc />
     public async Task<BookingDto?> GetBookingByIdAsync(Guid bookingId)
     {
-        var entity = Booking.FirstOrDefault(e => e.Id == bookingId);
+        var entity = await _bookingRepository.GetByIdAsync(bookingId);
         return await Task.FromResult(entity == null ? null : _mapper.Map<BookingDto>(entity));
     }
 }

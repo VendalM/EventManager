@@ -1,4 +1,5 @@
 using EventManager.Application.Interfaces;
+using EventManager.Application.Repositories;
 using EventManager.Application.Services;
 using EventManager.Mappers;
 
@@ -16,6 +17,9 @@ namespace EventManager.Application
         /// <returns>Коллекция сервисов для дальнейшей конфигурации</returns>
         public static IServiceCollection AddApplication(this IServiceCollection services)
         {
+            // Репозиторий
+            services.AddScoped<IBookingRepository, BookingRepository>();
+            
             // Бизнес-логика
             services.AddScoped<IEventService, EventService>();
             services.AddScoped<IBookingService, BookingService>();
