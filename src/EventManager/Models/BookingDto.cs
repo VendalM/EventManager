@@ -15,7 +15,7 @@ public class BookingDto
     /// <summary>
     /// Идентификатор события, к которому относится бронь
     /// </summary>
-    public int EventId { get; set; }
+    public Guid EventId { get; set; }
     
     /// <summary>
     /// Текущий статус брони

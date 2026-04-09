@@ -19,6 +19,7 @@ namespace EventManager.Application
         {
             // Репозиторий
             services.AddScoped<IBookingRepository, BookingRepository>();
+            services.AddScoped<IEventRepository, EventRepository>();
             
             // Бизнес-логика
             services.AddScoped<IEventService, EventService>();

@@ -2,16 +2,10 @@ using EventManager.Models;
 
 namespace EventManager.Tests.TestData;
 
-/// <summary>
-/// Класс, предоставляющий тестовые данные для проверки функциональности EventService
-/// </summary>
 public static class EventTestData
 {
     public static readonly DateTime FixedDate = new DateTime(2024, 12, 20, 0, 0, 0);
     
-    /// <summary>
-    /// Метод, возвращающий набор валидных событий для тестирования успешных сценариев
-    /// </summary>
     public static IEnumerable<object[]> ValidEventsData()
     {
         return new List<object[]>
@@ -55,46 +49,6 @@ public static class EventTestData
         };
     }
 
-    /// <summary>
-    /// Метод, возвращающий набор невалидных событий для тестирования сценариев с ошибками
-    /// </summary>
-    public static IEnumerable<object[]> InvalidEventsData()
-    {
-        return new List<object[]>
-        {
-            new object[] 
-            { 
-                new EventSaveDto 
-                { 
-                    Title = "Некорректное событие",
-                    StartDate = new DateTime(2024, 12, 25, 18, 0, 0),
-                    EndDate = new DateTime(2024, 12, 25, 10, 0, 0)
-                }
-            },
-            new object[] 
-            { 
-                new EventSaveDto 
-                { 
-                    Title = "",
-                    StartDate = FixedDate.AddDays(1),
-                    EndDate = FixedDate.AddDays(2)
-                }
-            },
-            new object[] 
-            { 
-                new EventSaveDto 
-                { 
-                    Title = null!,
-                    StartDate = FixedDate.AddDays(1),
-                    EndDate = FixedDate.AddDays(2)
-                }
-            }
-        };
-    }
-
-    /// <summary>
-    /// Метод, возвращающий список событий для тестирования фильтрации и пагинации
-    /// </summary>
     public static List<EventSaveDto> GetTestEventsList()
     {
         return new List<EventSaveDto>

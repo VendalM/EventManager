@@ -28,9 +28,9 @@ public class BookingService : IBookingService
     }
     
     /// <inheritdoc />
-    public async Task<BookingDto?> CreateBookingAsync(int eventId)
+    public async Task<BookingDto?> CreateBookingAsync(Guid eventId)
     {
-        if (!_eventService.HasEvent(eventId))
+        if (!await _eventService.HasEvent(eventId))
         {
             return null;
         }

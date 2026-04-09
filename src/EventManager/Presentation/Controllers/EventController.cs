@@ -33,18 +33,18 @@ public class EventController : ControllerBase
     /// @param page Номер страницы для пагинации (по умолчанию 1)
     /// @param pageSize Количество элементов на странице для пагинации (по умолчанию 10)
     [HttpGet]
-    public ActionResult<PaginatedResult<EventDto>> GetAllEvents(string? title, DateTime? from, DateTime? to, int page = 1, int pageSize = 10)
+    public async Task<ActionResult<PaginatedResult<EventDto>>> GetAllEvents(string? title, DateTime? from, DateTime? to, int page = 1, int pageSize = 10)
     {
-        return _eventService.GetAllEvents(title, from, to, page, pageSize);
+        return await _eventService.GetAllEvents(title, from, to, page, pageSize);
     }
     
     /// <summary>
     /// Получить событие по идентификатору
     /// </summary>
-    [HttpGet("{id:int}")]
-    public ActionResult<EventDto> GetById(int id)
+    [HttpGet("{id:guid}")]
+    public async Task<ActionResult<EventDto>> GetById(Guid id)
     {
-        var desiredEvent = _eventService.GetById(id);
+        var desiredEvent = await _eventService.GetById(id);
 
         if (desiredEvent == null)
         {
@@ -58,9 +58,9 @@ public class EventController : ControllerBase
     /// Создает новое событие
     /// </summary>
     [HttpPost]
-    public ActionResult<EventDto> Create([FromBody] EventSaveDto value)
+    public async Task<ActionResult<EventDto>> Create([FromBody] EventSaveDto value)
     {
-        var createdEvent = _eventService.Create(value);
+        var createdEvent = await _eventService.Create(value);
         
         return CreatedAtAction(nameof(GetById), new { id = createdEvent.Id }, createdEvent);
     }
@@ -69,14 +69,14 @@ public class EventController : ControllerBase
     /// Редактирует существующее событие
     /// </summary>
     [HttpPut("{id}")]
-    public ActionResult<EventDto> Update(int id,[FromBody] EventSaveDto updatedEvent)
+    public async Task<ActionResult<EventDto>> Update(Guid id,[FromBody] EventSaveDto updatedEvent)
     {
         if (updatedEvent.StartDate >= updatedEvent.EndDate)
         {
             throw new ValidationException("Дата окончания события должна быть больше даты начала.");
         }
         
-        var result = _eventService.Update(id, updatedEvent);
+        var result = await _eventService.Update(id, updatedEvent);
 
         if (result != null)
         {
@@ -90,9 +90,9 @@ public class EventController : ControllerBase
     /// Создать бронь для события
     /// </summary>
     [HttpPost("/events/{id}/book")]
-    public async Task<IActionResult> CreateBooking(int id)
+    public async Task<IActionResult> CreateBooking(Guid id)
     {
-        if (!_eventService.HasEvent(id))
+        if (!await _eventService.HasEvent(id))
         {
             throw new NotFoundException(id);
         }
@@ -112,10 +112,10 @@ public class EventController : ControllerBase
     /// <summary>
     /// Удаление
     /// </summary>
-    [HttpDelete("{id:int}")]
-    public IActionResult Delete(int id)
+    [HttpDelete("{id:guid}")]
+    public async Task<IActionResult> Delete(Guid id)
     {
-        if (_eventService.Delete(id))
+        if (await _eventService.Delete(id))
         { 
             return NoContent();
         }

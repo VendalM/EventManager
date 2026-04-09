@@ -1,4 +1,6 @@
 using AutoMapper;
+using EventManager.Application.Interfaces;
+using EventManager.Application.Repositories;
 using EventManager.Application.Services;
 using EventManager.Models;
 
@@ -11,6 +13,7 @@ public class EventServiceFixture
 {
     public EventService EventService { get; private set; }
     public IMapper Mapper { get; private set; }
+    public IEventRepository EventRepository { get; private set; }
 
     /// <summary>
     /// Конструктор, который настраивает AutoMapper и создает экземпляр EventService
@@ -25,6 +28,7 @@ public class EventServiceFixture
         });
         
         Mapper = config.CreateMapper();
-        EventService = new EventService(Mapper);
+        EventRepository = new EventRepository();
+        EventService = new EventService(Mapper, EventRepository);
     }
 }

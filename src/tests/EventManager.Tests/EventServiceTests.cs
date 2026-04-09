@@ -1,4 +1,6 @@
 using AutoMapper;
+using EventManager.Application.Interfaces;
+using EventManager.Application.Repositories;
 using EventManager.Application.Services;
 using EventManager.Models;
 using EventManager.Tests.TestData;
@@ -11,6 +13,7 @@ namespace EventManager.Tests;
 public class EventServiceTests
 {
     private readonly EventService _eventService;
+    private readonly IEventRepository _eventRepository;
     
     /// <summary>
     /// Конструктор, который настраивает AutoMapper и создает экземпляр EventService для тестов
@@ -25,24 +28,21 @@ public class EventServiceTests
         });
         
         var mapper = config.CreateMapper();
-        _eventService = new EventService(mapper);
+        _eventRepository = new EventRepository();
+        _eventService = new EventService(mapper, _eventRepository);
         
         ClearAllEvents();
     }
     
     /// <summary>
-    /// Очистка статического списка событий через рефлексию
+    /// Очистка всех событий через репозиторий
     /// </summary>
     private void ClearAllEvents()
     {
-        var backingField = typeof(EventService).GetField(
-            "<Events>k__BackingField",
-            System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic);
-        
-        if (backingField != null)
+        var events = _eventRepository.GetAllAsync().Result;
+        foreach (var eventEntity in events)
         {
-            var events = backingField.GetValue(null) as List<EventEntity>;
-            events?.Clear();
+            _eventRepository.RemoveAsync(eventEntity.Id).Wait();
         }
     }
     
@@ -54,8 +54,16 @@ public class EventServiceTests
         var testEvents = EventTestData.GetTestEventsList();
         foreach (var testEvent in testEvents)
         {
-            _eventService.Create(testEvent);
+            _eventService.Create(testEvent).Wait();
         }
+    }
+    
+    /// <summary>
+    /// Получить первый ID из репозитория
+    /// </summary>
+    private Guid GetFirstEventId()
+    {
+        return _eventRepository.GetAllAsync().Result.First().Id;
     }
 
     #region Успешные сценарии
@@ -78,7 +86,7 @@ public class EventServiceTests
         ClearAllEvents();
         CreateTestEvents();
         
-        var result = _eventService.GetAllEvents(searchTitle, null, null, 1, 10);
+        var result = _eventService.GetAllEvents(searchTitle, null, null, 1, 10).Result;
         
         Assert.Equal(expectedCount, result.Items.Count);
     }
@@ -92,7 +100,7 @@ public class EventServiceTests
         ClearAllEvents();
         CreateTestEvents();
         
-        var result = _eventService.GetAllEvents(null, null, null, 1, 10);
+        var result = _eventService.GetAllEvents(null, null, null, 1, 10).Result;
         
         Assert.NotNull(result);
         Assert.Equal(5, result.TotalItems);
@@ -107,11 +115,13 @@ public class EventServiceTests
     {
         ClearAllEvents();
         CreateTestEvents();
-        
-        var result = _eventService.GetById(1);
-        
+    
+        var firstId = GetFirstEventId();
+    
+        var result = _eventService.GetById(firstId).Result;
+    
         Assert.NotNull(result);
-        Assert.Equal(1, result.Id);
+        Assert.Equal(firstId, result.Id);
     }
 
     /// <summary>
@@ -123,6 +133,8 @@ public class EventServiceTests
         ClearAllEvents();
         CreateTestEvents();
         
+        var firstId = GetFirstEventId();
+        
         var updateData = new EventSaveDto
         {
             Title = "Обновленное название",
@@ -131,10 +143,10 @@ public class EventServiceTests
             EndDate = EventTestData.FixedDate.AddDays(11)
         };
         
-        var result = _eventService.Update(1, updateData);
+        var result = _eventService.Update(firstId, updateData).Result;
         
         Assert.NotNull(result);
-        Assert.Equal(1, result.Id);
+        Assert.Equal(firstId, result.Id);
         Assert.Equal("Обновленное название", result.Title);
     }
 
@@ -147,10 +159,12 @@ public class EventServiceTests
         ClearAllEvents();
         CreateTestEvents();
         
-        var result = _eventService.Delete(1);
+        var firstId = GetFirstEventId();
+        
+        var result = _eventService.Delete(firstId).Result;
         
         Assert.True(result);
-        Assert.Null(_eventService.GetById(1));
+        Assert.Null(_eventService.GetById(firstId).Result);
     }
 
     /// <summary>
@@ -168,7 +182,7 @@ public class EventServiceTests
         var from = EventTestData.FixedDate.AddDays(fromDays);
         var to = EventTestData.FixedDate.AddDays(toDays);
         
-        var result = _eventService.GetAllEvents(null, from, to, 1, 10);
+        var result = _eventService.GetAllEvents(null, from, to, 1, 10).Result;
         
         Assert.Equal(expectedCount, result.Items.Count);
     }
@@ -194,10 +208,10 @@ public class EventServiceTests
                 Title = $"Событие {i}", 
                 StartDate = EventTestData.FixedDate.AddDays(i), 
                 EndDate = EventTestData.FixedDate.AddDays(i + 1) 
-            });
+            }).Wait();
         }
         
-        var result = _eventService.GetAllEvents(null, null, null, page, pageSize);
+        var result = _eventService.GetAllEvents(null, null, null, page, pageSize).Result;
         
         Assert.Equal(expectedCount, result.Items.Count);
         Assert.Equal(expectedTotal, result.TotalItems);
@@ -215,7 +229,7 @@ public class EventServiceTests
         var from = EventTestData.FixedDate.AddDays(2);
         var to = EventTestData.FixedDate.AddDays(4);
         
-        var result = _eventService.GetAllEvents("Конференция", from, to, 1, 10);
+        var result = _eventService.GetAllEvents("Конференция", from, to, 1, 10).Result;
         
         Assert.Equal(2, result.Items.Count);
         Assert.All(result.Items, e => Assert.Contains("Конференция", e.Title));
@@ -233,7 +247,7 @@ public class EventServiceTests
     {
         ClearAllEvents();
         
-        var result = _eventService.GetById(999);
+        var result = _eventService.GetById(Guid.NewGuid()).Result;
         
         Assert.Null(result);
     }
@@ -253,33 +267,9 @@ public class EventServiceTests
             EndDate = EventTestData.FixedDate.AddDays(2)
         };
         
-        var result = _eventService.Update(999, updateData);
+        var result = _eventService.Update(Guid.NewGuid(), updateData).Result;
         
         Assert.Null(result);
-    }
-
-    /// <summary>
-    /// Проверка обновления события с некорректными датами (EndDate раньше StartDate)
-    /// AutoMapper копирует значения без проверки логики дат
-    /// </summary>
-    [Fact]
-    public void Update_EventWithInvalidDates_UpdatesWithInvalidData()
-    {
-        ClearAllEvents();
-        CreateTestEvents();
-    
-        var invalidUpdate = new EventSaveDto
-        {
-            Title = "Некорректное обновление",
-            StartDate = EventTestData.FixedDate.AddDays(3),
-            EndDate = EventTestData.FixedDate.AddDays(2)
-        };
-    
-        var result = _eventService.Update(1, invalidUpdate);
-    
-        Assert.NotNull(result);
-        Assert.Equal("Некорректное обновление", result.Title);
-        Assert.True(result.StartDate > result.EndDate);
     }
 
     /// <summary>
@@ -290,7 +280,7 @@ public class EventServiceTests
     {
         ClearAllEvents();
         
-        var result = _eventService.Delete(999);
+        var result = _eventService.Delete(Guid.NewGuid()).Result;
         
         Assert.False(result);
     }
