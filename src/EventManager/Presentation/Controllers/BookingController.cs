@@ -24,13 +24,13 @@ public class BookingController : ControllerBase
     /// <summary>
     /// Получить бронь по идентификатору
     /// </summary>
-    [HttpPost("/bookings/{id}")]
+    [HttpGet("/bookings/{id}")]
     public async Task<IActionResult> GetBooking(Guid id)
     {
         var result = await _bookingService.GetBookingByIdAsync(id);
         if (result != null)
         {
-            return CreatedAtAction(nameof(GetBooking), new { id = result.Id }, result);
+            return  Ok(result);
         }
 
         throw new NotFoundException(id);

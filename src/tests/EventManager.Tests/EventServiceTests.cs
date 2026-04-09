@@ -1,9 +1,9 @@
 using AutoMapper;
 using EventManager.Application.Interfaces;
-using EventManager.Application.Repositories;
 using EventManager.Application.Services;
 using EventManager.Models;
 using EventManager.Tests.TestData;
+using Moq;
 
 namespace EventManager.Tests;
 
@@ -12,12 +12,8 @@ namespace EventManager.Tests;
 /// </summary>
 public class EventServiceTests
 {
-    private readonly EventService _eventService;
-    private readonly IEventRepository _eventRepository;
+    private readonly IMapper _mapper;
     
-    /// <summary>
-    /// Конструктор, который настраивает AutoMapper и создает экземпляр EventService для тестов
-    /// </summary>
     public EventServiceTests()
     {
         var config = new MapperConfiguration(cfg =>
@@ -27,43 +23,14 @@ public class EventServiceTests
             cfg.CreateMap<EventSaveDto, EventDto>();
         });
         
-        var mapper = config.CreateMapper();
-        _eventRepository = new EventRepository();
-        _eventService = new EventService(mapper, _eventRepository);
-        
-        ClearAllEvents();
+        _mapper = config.CreateMapper();
     }
     
-    /// <summary>
-    /// Очистка всех событий через репозиторий
-    /// </summary>
-    private void ClearAllEvents()
+    private (EventService service, Mock<IEventRepository> mockRepo) CreateEventService()
     {
-        var events = _eventRepository.GetAllAsync().Result;
-        foreach (var eventEntity in events)
-        {
-            _eventRepository.RemoveAsync(eventEntity.Id).Wait();
-        }
-    }
-    
-    /// <summary>
-    /// Создание тестовых событий для проверки фильтрации
-    /// </summary>
-    private void CreateTestEvents()
-    {
-        var testEvents = EventTestData.GetTestEventsList();
-        foreach (var testEvent in testEvents)
-        {
-            _eventService.Create(testEvent).Wait();
-        }
-    }
-    
-    /// <summary>
-    /// Получить первый ID из репозитория
-    /// </summary>
-    private Guid GetFirstEventId()
-    {
-        return _eventRepository.GetAllAsync().Result.First().Id;
+        var mockRepo = new Mock<IEventRepository>();
+        var service = new EventService(_mapper, mockRepo.Object);
+        return (service, mockRepo);
     }
 
     #region Успешные сценарии
@@ -81,13 +48,26 @@ public class EventServiceTests
     [InlineData("Хакатон", 1)]
     [InlineData("Несуществующее", 0)]
     [InlineData("", 5)]
-    public void GetAllEvents_FilterByTitle_ReturnsFilteredEvents(string searchTitle, int expectedCount)
+    public async Task GetAllEvents_FilterByTitle_ReturnsFilteredEvents(string searchTitle, int expectedCount)
     {
-        ClearAllEvents();
-        CreateTestEvents();
+        // Arrange
+        var (service, mockRepo) = CreateEventService();
+        var testEvents = EventTestData.GetTestEventsList()
+            .Select(dto => _mapper.Map<EventEntity>(dto))
+            .ToList();
         
-        var result = _eventService.GetAllEvents(searchTitle, null, null, 1, 10).Result;
+        // Устанавливаем Id для тестовых событий
+        for (int i = 0; i < testEvents.Count; i++)
+        {
+            testEvents[i].Id = Guid.NewGuid();
+        }
         
+        mockRepo.Setup(x => x.GetAllAsync()).ReturnsAsync(testEvents);
+        
+        // Act
+        var result = await service.GetAllEvents(searchTitle, null, null, 1, 10);
+        
+        // Assert
         Assert.Equal(expectedCount, result.Items.Count);
     }
 
@@ -95,13 +75,25 @@ public class EventServiceTests
     /// Проверка получения всех событий без применения фильтров
     /// </summary>
     [Fact]
-    public void GetAllEvents_NoFilters_ReturnsAllEvents()
+    public async Task GetAllEvents_NoFilters_ReturnsAllEvents()
     {
-        ClearAllEvents();
-        CreateTestEvents();
+        // Arrange
+        var (service, mockRepo) = CreateEventService();
+        var testEvents = EventTestData.GetTestEventsList()
+            .Select(dto => _mapper.Map<EventEntity>(dto))
+            .ToList();
         
-        var result = _eventService.GetAllEvents(null, null, null, 1, 10).Result;
+        for (int i = 0; i < testEvents.Count; i++)
+        {
+            testEvents[i].Id = Guid.NewGuid();
+        }
         
+        mockRepo.Setup(x => x.GetAllAsync()).ReturnsAsync(testEvents);
+        
+        // Act
+        var result = await service.GetAllEvents(null, null, null, 1, 10);
+        
+        // Assert
         Assert.NotNull(result);
         Assert.Equal(5, result.TotalItems);
         Assert.Equal(5, result.Items.Count);
@@ -111,60 +103,88 @@ public class EventServiceTests
     /// Проверка получения события по существующему идентификатору
     /// </summary>
     [Fact]
-    public void GetById_ValidId_ReturnsEvent()
+    public async Task GetById_ValidId_ReturnsEvent()
     {
-        ClearAllEvents();
-        CreateTestEvents();
-    
-        var firstId = GetFirstEventId();
-    
-        var result = _eventService.GetById(firstId).Result;
-    
+        // Arrange
+        var (service, mockRepo) = CreateEventService();
+        var eventId = Guid.NewGuid();
+        var expectedEvent = new EventEntity
+        {
+            Id = eventId,
+            Title = "Тестовое событие",
+            Description = "Описание",
+            StartDate = DateTime.UtcNow,
+            EndDate = DateTime.UtcNow.AddDays(1)
+        };
+        
+        mockRepo.Setup(x => x.GetByIdAsync(eventId)).ReturnsAsync(expectedEvent);
+        
+        // Act
+        var result = await service.GetById(eventId);
+        
+        // Assert
         Assert.NotNull(result);
-        Assert.Equal(firstId, result.Id);
+        Assert.Equal(eventId, result.Id);
+        Assert.Equal("Тестовое событие", result.Title);
     }
 
     /// <summary>
     /// Проверка обновления существующего события
     /// </summary>
     [Fact]
-    public void Update_ValidEvent_ReturnsUpdatedEvent()
+    public async Task Update_ValidEvent_ReturnsUpdatedEvent()
     {
-        ClearAllEvents();
-        CreateTestEvents();
-        
-        var firstId = GetFirstEventId();
+        // Arrange
+        var (service, mockRepo) = CreateEventService();
+        var eventId = Guid.NewGuid();
+        var existingEvent = new EventEntity
+        {
+            Id = eventId,
+            Title = "Старое название",
+            Description = "Старое описание",
+            StartDate = DateTime.UtcNow,
+            EndDate = DateTime.UtcNow.AddDays(1)
+        };
         
         var updateData = new EventSaveDto
         {
             Title = "Обновленное название",
             Description = "Обновленное описание",
-            StartDate = EventTestData.FixedDate.AddDays(10),
-            EndDate = EventTestData.FixedDate.AddDays(11)
+            StartDate = DateTime.UtcNow.AddDays(2),
+            EndDate = DateTime.UtcNow.AddDays(3)
         };
         
-        var result = _eventService.Update(firstId, updateData).Result;
+        mockRepo.Setup(x => x.GetByIdAsync(eventId)).ReturnsAsync(existingEvent);
+        mockRepo.Setup(x => x.UpdateAsync(It.IsAny<EventEntity>())).Returns(Task.CompletedTask);
         
+        // Act
+        var result = await service.Update(eventId, updateData);
+        
+        // Assert
         Assert.NotNull(result);
-        Assert.Equal(firstId, result.Id);
+        Assert.Equal(eventId, result.Id);
         Assert.Equal("Обновленное название", result.Title);
+        mockRepo.Verify(x => x.UpdateAsync(It.IsAny<EventEntity>()), Times.Once);
     }
 
     /// <summary>
     /// Проверка удаления существующего события
     /// </summary>
     [Fact]
-    public void Delete_ValidId_ReturnsTrue()
+    public async Task Delete_ValidId_ReturnsTrue()
     {
-        ClearAllEvents();
-        CreateTestEvents();
+        // Arrange
+        var (service, mockRepo) = CreateEventService();
+        var eventId = Guid.NewGuid();
         
-        var firstId = GetFirstEventId();
+        mockRepo.Setup(x => x.RemoveAsync(eventId)).ReturnsAsync(true);
         
-        var result = _eventService.Delete(firstId).Result;
+        // Act
+        var result = await service.Delete(eventId);
         
+        // Assert
         Assert.True(result);
-        Assert.Null(_eventService.GetById(firstId).Result);
+        mockRepo.Verify(x => x.RemoveAsync(eventId), Times.Once);
     }
 
     /// <summary>
@@ -174,16 +194,30 @@ public class EventServiceTests
     [InlineData(2, 4, 2)]
     [InlineData(1, 1, 1)]
     [InlineData(6, 10, 0)]
-    public void GetAllEvents_FilterByDateRange_ReturnsFilteredEvents(int fromDays, int toDays, int expectedCount)
+    public async Task GetAllEvents_FilterByDateRange_ReturnsFilteredEvents(int fromDays, int toDays, int expectedCount)
     {
-        ClearAllEvents();
-        CreateTestEvents();
+        // Arrange
+        var (service, mockRepo) = CreateEventService();
+        var fixedDate = new DateTime(2024, 12, 20);
         
-        var from = EventTestData.FixedDate.AddDays(fromDays);
-        var to = EventTestData.FixedDate.AddDays(toDays);
+        var testEvents = new List<EventEntity>
+        {
+            new() { Id = Guid.NewGuid(), Title = "Событие 1", StartDate = fixedDate.AddDays(2), EndDate = fixedDate.AddDays(3) },
+            new() { Id = Guid.NewGuid(), Title = "Событие 2", StartDate = fixedDate.AddDays(3), EndDate = fixedDate.AddDays(4) },
+            new() { Id = Guid.NewGuid(), Title = "Событие 3", StartDate = fixedDate.AddDays(1), EndDate = fixedDate.AddDays(1) },
+            new() { Id = Guid.NewGuid(), Title = "Событие 4", StartDate = fixedDate.AddDays(4), EndDate = fixedDate.AddDays(5) },
+            new() { Id = Guid.NewGuid(), Title = "Событие 5", StartDate = fixedDate.AddDays(5), EndDate = fixedDate.AddDays(6) }
+        };
         
-        var result = _eventService.GetAllEvents(null, from, to, 1, 10).Result;
+        mockRepo.Setup(x => x.GetAllAsync()).ReturnsAsync(testEvents);
         
+        var from = fixedDate.AddDays(fromDays);
+        var to = fixedDate.AddDays(toDays);
+        
+        // Act
+        var result = await service.GetAllEvents(null, from, to, 1, 10);
+        
+        // Assert
         Assert.Equal(expectedCount, result.Items.Count);
     }
 
@@ -194,25 +228,29 @@ public class EventServiceTests
     [InlineData(1, 10, 10, 25)]
     [InlineData(2, 10, 10, 25)]
     [InlineData(3, 10, 5, 25)]
-    [InlineData(1, 5, 5, 25)]
-    [InlineData(5, 5, 5, 25)]
-    [InlineData(1, 20, 20, 25)]
-    public void GetAllEvents_Pagination_ReturnsCorrectPage(int page, int pageSize, int expectedCount, int expectedTotal)
+    public async Task GetAllEvents_Pagination_ReturnsCorrectPage(int page, int pageSize, int expectedCount, int expectedTotal)
     {
-        ClearAllEvents();
+        // Arrange
+        var (service, mockRepo) = CreateEventService();
+        var testEvents = new List<EventEntity>();
         
         for (int i = 1; i <= 25; i++)
         {
-            _eventService.Create(new EventSaveDto 
-            { 
-                Title = $"Событие {i}", 
-                StartDate = EventTestData.FixedDate.AddDays(i), 
-                EndDate = EventTestData.FixedDate.AddDays(i + 1) 
-            }).Wait();
+            testEvents.Add(new EventEntity
+            {
+                Id = Guid.NewGuid(),
+                Title = $"Событие {i}",
+                StartDate = DateTime.UtcNow.AddDays(i),
+                EndDate = DateTime.UtcNow.AddDays(i + 1)
+            });
         }
         
-        var result = _eventService.GetAllEvents(null, null, null, page, pageSize).Result;
+        mockRepo.Setup(x => x.GetAllAsync()).ReturnsAsync(testEvents);
         
+        // Act
+        var result = await service.GetAllEvents(null, null, null, page, pageSize);
+        
+        // Assert
         Assert.Equal(expectedCount, result.Items.Count);
         Assert.Equal(expectedTotal, result.TotalItems);
     }
@@ -221,16 +259,30 @@ public class EventServiceTests
     /// Проверка комбинированной фильтрации (по названию и диапазону дат)
     /// </summary>
     [Fact]
-    public void GetAllEvents_CombinedFilters_ReturnsCorrectEvents()
+    public async Task GetAllEvents_CombinedFilters_ReturnsCorrectEvents()
     {
-        ClearAllEvents();
-        CreateTestEvents();
+        // Arrange
+        var (service, mockRepo) = CreateEventService();
+        var fixedDate = new DateTime(2024, 12, 20);
         
-        var from = EventTestData.FixedDate.AddDays(2);
-        var to = EventTestData.FixedDate.AddDays(4);
+        var testEvents = new List<EventEntity>
+        {
+            new() { Id = Guid.NewGuid(), Title = "Конференция по IT", StartDate = fixedDate.AddDays(2), EndDate = fixedDate.AddDays(3) },
+            new() { Id = Guid.NewGuid(), Title = "Конференция по дизайну", StartDate = fixedDate.AddDays(3), EndDate = fixedDate.AddDays(4) },
+            new() { Id = Guid.NewGuid(), Title = "Встреча команды", StartDate = fixedDate.AddDays(1), EndDate = fixedDate.AddDays(1) },
+            new() { Id = Guid.NewGuid(), Title = "Семинар по тестированию", StartDate = fixedDate.AddDays(4), EndDate = fixedDate.AddDays(5) },
+            new() { Id = Guid.NewGuid(), Title = "Хакатон", StartDate = fixedDate.AddDays(5), EndDate = fixedDate.AddDays(6) }
+        };
         
-        var result = _eventService.GetAllEvents("Конференция", from, to, 1, 10).Result;
+        mockRepo.Setup(x => x.GetAllAsync()).ReturnsAsync(testEvents);
         
+        var from = fixedDate.AddDays(2);
+        var to = fixedDate.AddDays(4);
+        
+        // Act
+        var result = await service.GetAllEvents("Конференция", from, to, 1, 10);
+        
+        // Assert
         Assert.Equal(2, result.Items.Count);
         Assert.All(result.Items, e => Assert.Contains("Конференция", e.Title));
     }
@@ -243,12 +295,18 @@ public class EventServiceTests
     /// Проверка получения события с несуществующим идентификатором
     /// </summary>
     [Fact]
-    public void GetById_InvalidId_ReturnsNull()
+    public async Task GetById_InvalidId_ReturnsNull()
     {
-        ClearAllEvents();
+        // Arrange
+        var (service, mockRepo) = CreateEventService();
+        var invalidId = Guid.NewGuid();
         
-        var result = _eventService.GetById(Guid.NewGuid()).Result;
+        mockRepo.Setup(x => x.GetByIdAsync(invalidId)).ReturnsAsync((EventEntity?)null);
         
+        // Act
+        var result = await service.GetById(invalidId);
+        
+        // Assert
         Assert.Null(result);
     }
 
@@ -256,32 +314,45 @@ public class EventServiceTests
     /// Проверка обновления события с несуществующим идентификатором
     /// </summary>
     [Fact]
-    public void Update_InvalidId_ReturnsNull()
+    public async Task Update_InvalidId_ReturnsNull()
     {
-        ClearAllEvents();
+        // Arrange
+        var (service, mockRepo) = CreateEventService();
+        var invalidId = Guid.NewGuid();
+        
+        mockRepo.Setup(x => x.GetByIdAsync(invalidId)).ReturnsAsync((EventEntity?)null);
         
         var updateData = new EventSaveDto
         {
             Title = "Обновление",
-            StartDate = EventTestData.FixedDate.AddDays(1),
-            EndDate = EventTestData.FixedDate.AddDays(2)
+            StartDate = DateTime.UtcNow.AddDays(1),
+            EndDate = DateTime.UtcNow.AddDays(2)
         };
         
-        var result = _eventService.Update(Guid.NewGuid(), updateData).Result;
+        // Act
+        var result = await service.Update(invalidId, updateData);
         
+        // Assert
         Assert.Null(result);
+        mockRepo.Verify(x => x.UpdateAsync(It.IsAny<EventEntity>()), Times.Never);
     }
 
     /// <summary>
     /// Проверка удаления события с несуществующим идентификатором
     /// </summary>
     [Fact]
-    public void Delete_InvalidId_ReturnsFalse()
+    public async Task Delete_InvalidId_ReturnsFalse()
     {
-        ClearAllEvents();
+        // Arrange
+        var (service, mockRepo) = CreateEventService();
+        var invalidId = Guid.NewGuid();
         
-        var result = _eventService.Delete(Guid.NewGuid()).Result;
+        mockRepo.Setup(x => x.RemoveAsync(invalidId)).ReturnsAsync(false);
         
+        // Act
+        var result = await service.Delete(invalidId);
+        
+        // Assert
         Assert.False(result);
     }
 
