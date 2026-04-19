@@ -20,14 +20,8 @@ public class EventMappingProfile : Profile
             .ForMember(dest => dest.StartDate, 
                 opt => opt.MapFrom(src => src.StartDate!.Value))
             .ForMember(dest => dest.EndDate, 
-                opt => opt.MapFrom(src => src.EndDate!.Value));
-        
-        CreateMap<EventSaveDto, EventEntity>()
-            .ForMember(dest => dest.Id, opt => opt.Ignore())
-            .ForMember(dest => dest.StartDate, 
-                opt => opt.MapFrom(src => src.StartDate!.Value))
-            .ForMember(dest => dest.EndDate, 
-                opt => opt.MapFrom(src => src.EndDate!.Value));
+                opt => opt.MapFrom(src => src.EndDate!.Value))
+            .ForMember(dest => dest.AvailableSeats, opt => opt.MapFrom(src => src.TotalSeats));
         
         CreateMap<BookingDto, BookingEntity>()
             .ReverseMap();
