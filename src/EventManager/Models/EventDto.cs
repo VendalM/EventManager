@@ -1,5 +1,3 @@
-using System.ComponentModel.DataAnnotations;
-
 namespace EventManager.Models;
 
 /// <summary>
@@ -10,7 +8,7 @@ public class EventDto
     /// <summary>
     /// Идентификатор
     /// </summary>
-    public int Id { get; set; }
+    public Guid Id { get; set; }
     
     /// <summary>
     /// Заголовок события

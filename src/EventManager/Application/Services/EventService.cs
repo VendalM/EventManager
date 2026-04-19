@@ -9,26 +9,24 @@ namespace EventManager.Application.Services;
 /// </summary>
 public class EventService : IEventService
 {
-    /// <summary>
-    /// Все доступные события (временное хранилище)
-    /// </summary>
-    private static List<EventEntity> Events { get; set; } = new List<EventEntity>();
-    
     private readonly IMapper _mapper;
+    private readonly IEventRepository _eventRepository;
 
     /// <summary>
     /// Конструктор сервиса событий
     /// </summary>
     /// <param name="mapper">AutoMapper для преобразования сущностей</param>
-    public EventService(IMapper mapper)
+    /// <param name="eventRepository">Экземпляр репозитория событий</param>
+    public EventService(IMapper mapper, IEventRepository eventRepository)
     {
         _mapper = mapper;
+        _eventRepository = eventRepository;
     }
     
     /// <inheritdoc />
-    public PaginatedResult<EventDto> GetAllEvents(string? title, DateTime? from, DateTime? to, int page = 1, int pageSize = 10)
+    public async Task<PaginatedResult<EventDto>> GetAllEvents(string? title, DateTime? from, DateTime? to, int page = 1, int pageSize = 10)
     {
-        var query = Events.AsQueryable();
+        var query = (await _eventRepository.GetAllAsync()).AsQueryable();
         
         if (!string.IsNullOrEmpty(title))
         {
@@ -62,51 +60,49 @@ public class EventService : IEventService
     }
     
     /// <inheritdoc />
-    public EventDto? GetById(int id)
+    public async Task<EventDto?> GetById(Guid id)
     {
-        var entity = Events.FirstOrDefault(e => e.Id == id);
+        var entity = await _eventRepository.GetByIdAsync(id);
         return entity == null ? null : _mapper.Map<EventDto>(entity);
     }
     
     /// <inheritdoc />
-    public EventDto Create(EventSaveDto newEvent)
+    public async Task<EventDto> Create(EventSaveDto newEvent)
     {
         // Маппинг SaveDto -> Entity
         var entity = _mapper.Map<EventEntity>(newEvent);
-        entity.Id = GenerateNewId();
+        entity.Id = Guid.NewGuid();
         
-        Events.Add(entity);
+        await _eventRepository.AddAsync(entity);
         
         // Маппинг Entity -> Dto для ответа
         return _mapper.Map<EventDto>(entity);
     }
     
     /// <inheritdoc />
-    public EventDto? Update(int id, EventSaveDto updatedEvent)
+    public async Task<EventDto?> Update(Guid id, EventSaveDto updatedEvent)
     {
-        var existingEntity = Events.FirstOrDefault(e => e.Id == id);
+        var existingEntity = await _eventRepository.GetByIdAsync(id);
         
         if (existingEntity == null)
             return null;
 
         // Обновляем существующую сущность
         _mapper.Map(updatedEvent, existingEntity);
+        await _eventRepository.UpdateAsync(existingEntity);
         
         return _mapper.Map<EventDto>(existingEntity);
     }
     
     /// <inheritdoc />
-    public bool Delete(int id)
+    public async Task<bool> Delete(Guid id)
     {
-        return Events.RemoveAll(e => e.Id == id) > 0;
+        return await _eventRepository.RemoveAsync(id);
     }
     
-    /// <summary>
-    /// Генерация идентификатора события
-    /// </summary>
-    /// <returns>Новый идентификатор</returns>
-    private int GenerateNewId()
+    /// <inheritdoc />
+    public async Task<bool> HasEvent(Guid id)
     {
-        return Events.Any() ? Events.Max(e => e.Id) + 1 : 1;
+        return await _eventRepository.HasEventAsync(id);
     }
 }

@@ -1,5 +1,6 @@
 using System.Reflection;
 using EventManager.Filters;
+using EventManager.Presentation.Background;
 
 namespace EventManager.Presentation
 {
@@ -35,6 +36,7 @@ namespace EventManager.Presentation
                 var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
                 options.IncludeXmlComments(xmlPath);
             });
+            services.AddHostedService<BookingBackgroundService>();
 
             return services;
         }
