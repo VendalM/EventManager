@@ -69,13 +69,12 @@ public class EventService : IEventService
     /// <inheritdoc />
     public async Task<EventDto> Create(EventSaveDto newEvent)
     {
-        // Маппинг SaveDto -> Entity
         var entity = _mapper.Map<EventEntity>(newEvent);
         entity.Id = Guid.NewGuid();
+        entity.AvailableSeats = entity.TotalSeats;
         
         await _eventRepository.AddAsync(entity);
         
-        // Маппинг Entity -> Dto для ответа
         return _mapper.Map<EventDto>(entity);
     }
     
@@ -86,8 +85,21 @@ public class EventService : IEventService
         
         if (existingEntity == null)
             return null;
-
-        // Обновляем существующую сущность
+        
+        _mapper.Map(updatedEvent, existingEntity);
+        await _eventRepository.UpdateAsync(existingEntity);
+        
+        return _mapper.Map<EventDto>(existingEntity);
+    }
+    
+    /// <inheritdoc />
+    public async Task<EventDto?> UpdateInternal(Guid id, EventDto updatedEvent)
+    {
+        var existingEntity = await _eventRepository.GetByIdAsync(id);
+        
+        if (existingEntity == null)
+            return null;
+        
         _mapper.Map(updatedEvent, existingEntity);
         await _eventRepository.UpdateAsync(existingEntity);
         

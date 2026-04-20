@@ -13,15 +13,15 @@ public class EventMappingProfile : Profile
     /// </summary>
     public EventMappingProfile()
     {
-        CreateMap<EventEntity, EventDto>();
-        
+        CreateMap<EventEntity, EventDto>()
+            .ReverseMap();
+
         CreateMap<EventSaveDto, EventEntity>()
             .ForMember(dest => dest.Id, opt => opt.Ignore())
-            .ForMember(dest => dest.StartDate, 
+            .ForMember(dest => dest.StartDate,
                 opt => opt.MapFrom(src => src.StartDate!.Value))
-            .ForMember(dest => dest.EndDate, 
-                opt => opt.MapFrom(src => src.EndDate!.Value))
-            .ForMember(dest => dest.AvailableSeats, opt => opt.MapFrom(src => src.TotalSeats));
+            .ForMember(dest => dest.EndDate,
+                opt => opt.MapFrom(src => src.EndDate!.Value));
         
         CreateMap<BookingDto, BookingEntity>()
             .ReverseMap();

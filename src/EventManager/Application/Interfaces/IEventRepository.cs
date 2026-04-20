@@ -36,7 +36,7 @@ public interface IEventRepository
     Task<bool> RemoveAsync(Guid id);
 
     /// <summary>
-    /// Получение всех бронирований
+    /// Проверить, существует ли событие с данным идентификатором
     /// </summary>
     Task<bool> HasEventAsync(Guid id);
 }

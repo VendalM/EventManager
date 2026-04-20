@@ -82,6 +82,7 @@ public class GlobalExceptionHandlingMiddleware
         {
             ValidationException ve => StatusCodes.Status400BadRequest,
             NotFoundException nfe => StatusCodes.Status404NotFound,
+            NoAvailableSeatsException nfe => StatusCodes.Status409Conflict,
             _ => StatusCodes.Status500InternalServerError
         };
 }
