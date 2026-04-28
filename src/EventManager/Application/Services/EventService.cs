@@ -1,5 +1,6 @@
 using AutoMapper;
 using EventManager.Application.Interfaces;
+using EventManager.Exceptions;
 using EventManager.Models;
 
 namespace EventManager.Application.Services;
@@ -11,6 +12,7 @@ public class EventService : IEventService
 {
     private readonly IMapper _mapper;
     private readonly IEventRepository _eventRepository;
+    private readonly SemaphoreSlim _semaphore = new(1, 1);
 
     /// <summary>
     /// Конструктор сервиса событий
@@ -81,15 +83,37 @@ public class EventService : IEventService
     /// <inheritdoc />
     public async Task<EventDto?> Update(Guid id, EventSaveDto updatedEvent)
     {
-        var existingEntity = await _eventRepository.GetByIdAsync(id);
-        
-        if (existingEntity == null)
-            return null;
-        
-        _mapper.Map(updatedEvent, existingEntity);
-        await _eventRepository.UpdateAsync(existingEntity);
-        
-        return _mapper.Map<EventDto>(existingEntity);
+        await _semaphore.WaitAsync();
+        try
+        {
+             var existingEntity = await _eventRepository.GetByIdAsync(id);
+
+            if (existingEntity == null)
+                return null;
+
+            var occupiedSeats = existingEntity.TotalSeats - existingEntity.AvailableSeats;
+            _mapper.Map(updatedEvent, existingEntity);
+
+            if (updatedEvent.TotalSeats.HasValue)
+            {
+                var newTotal = existingEntity.TotalSeats;
+
+                if (newTotal < occupiedSeats)
+                {
+                    throw new TotalSeatsTooLowException(existingEntity.Title, newTotal, occupiedSeats);
+                }
+
+                existingEntity.AvailableSeats = newTotal - occupiedSeats;
+            }
+
+            await _eventRepository.UpdateAsync(existingEntity);
+            
+            return _mapper.Map<EventDto>(existingEntity);
+        }
+        finally
+        {
+            _semaphore.Release();
+        }
     }
     
     /// <inheritdoc />
