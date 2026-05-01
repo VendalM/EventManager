@@ -14,7 +14,7 @@ public class BookingService : IBookingService
     private readonly IMapper _mapper;
     private readonly IEventService _eventService;
     private readonly IBookingRepository _bookingRepository;
-    private readonly SemaphoreSlim _semaphore = new(1, 1);
+
     
     /// <summary>
     /// Конструктор, который принимает зависимости для работы сервиса бронирования
@@ -35,7 +35,7 @@ public class BookingService : IBookingService
         BookingEntity entity;
         
         // Блокируем доступ к ресурсу, чтобы избежать гонки при бронировании последних мест
-        await _semaphore.WaitAsync();
+        await EventSemaphore.Semaphore.WaitAsync();
         try
         {
             var eventForBooking = await _eventService.GetById(eventId);
@@ -64,7 +64,7 @@ public class BookingService : IBookingService
         } 
         finally
         {
-            _semaphore.Release();
+            EventSemaphore.Semaphore.Release();
         }
         
         return _mapper.Map<BookingDto>(entity);

@@ -12,7 +12,6 @@ public class EventService : IEventService
 {
     private readonly IMapper _mapper;
     private readonly IEventRepository _eventRepository;
-    private readonly SemaphoreSlim _semaphore = new(1, 1);
 
     /// <summary>
     /// Конструктор сервиса событий
@@ -83,7 +82,7 @@ public class EventService : IEventService
     /// <inheritdoc />
     public async Task<EventDto?> Update(Guid id, EventSaveDto updatedEvent)
     {
-        await _semaphore.WaitAsync();
+        await EventSemaphore.Semaphore.WaitAsync();
         try
         {
              var existingEntity = await _eventRepository.GetByIdAsync(id);
@@ -112,7 +111,7 @@ public class EventService : IEventService
         }
         finally
         {
-            _semaphore.Release();
+            EventSemaphore.Semaphore.Release();
         }
     }
     
