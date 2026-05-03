@@ -1,4 +1,5 @@
 using AutoMapper;
+using EventManager.Application;
 using EventManager.Application.Interfaces;
 using EventManager.Enums;
 using EventManager.Models;
@@ -13,7 +14,6 @@ public class BookingBackgroundService : BackgroundService
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILogger<BookingBackgroundService> _logger;
     private readonly TimeSpan _pollingInterval = TimeSpan.FromSeconds(5); // Опрос каждые 5 секунд
-    private readonly SemaphoreSlim _processingSemaphore = new(1, 1); 
     private readonly IMapper _mapper;
  
     /// <summary>
@@ -93,7 +93,7 @@ public class BookingBackgroundService : BackgroundService
             return;
         }
         
-        await _processingSemaphore.WaitAsync(ct);
+        await EventSemaphore.Semaphore.WaitAsync(ct);
         try
         {
             booking.Confirm();
@@ -124,7 +124,7 @@ public class BookingBackgroundService : BackgroundService
         }
         finally
         {
-            _processingSemaphore.Release();
+            EventSemaphore.Semaphore.Release();
         }
     }
 }
