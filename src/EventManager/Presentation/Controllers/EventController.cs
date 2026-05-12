@@ -90,6 +90,7 @@ public class EventController : ControllerBase
     /// Создать бронь для события
     /// </summary>
     [HttpPost("/events/{id}/book")]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<IActionResult> CreateBooking(Guid id)
     {
         if (!await _eventService.HasEvent(id))

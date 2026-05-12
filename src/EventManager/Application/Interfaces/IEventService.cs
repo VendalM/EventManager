@@ -39,6 +39,14 @@ public interface IEventService
     /// <param name="updatedEvent">Обновляемое событие</param>
     /// <returns>Удалось ли обновить событие?</returns>
     public Task<EventDto?> Update(Guid id, EventSaveDto updatedEvent);
+    
+    /// <summary>
+    /// Внутреннее обновление (для бронирований)
+    /// </summary>
+    /// <param name="id">Идентификатор</param>
+    /// <param name="updatedEvent">Обновляемое событие</param>
+    /// <returns>Удалось ли обновить событие?</returns>
+    public Task<EventDto?> UpdateInternal(Guid id, EventDto updatedEvent);
 
     /// <summary>
     /// Удалить событие

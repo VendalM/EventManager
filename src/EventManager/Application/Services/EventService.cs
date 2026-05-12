@@ -1,5 +1,6 @@
 using AutoMapper;
 using EventManager.Application.Interfaces;
+using EventManager.Exceptions;
 using EventManager.Models;
 
 namespace EventManager.Application.Services;
@@ -69,25 +70,59 @@ public class EventService : IEventService
     /// <inheritdoc />
     public async Task<EventDto> Create(EventSaveDto newEvent)
     {
-        // Маппинг SaveDto -> Entity
         var entity = _mapper.Map<EventEntity>(newEvent);
         entity.Id = Guid.NewGuid();
+        entity.AvailableSeats = entity.TotalSeats;
         
         await _eventRepository.AddAsync(entity);
         
-        // Маппинг Entity -> Dto для ответа
         return _mapper.Map<EventDto>(entity);
     }
     
     /// <inheritdoc />
     public async Task<EventDto?> Update(Guid id, EventSaveDto updatedEvent)
     {
+        await EventSemaphore.Semaphore.WaitAsync();
+        try
+        {
+             var existingEntity = await _eventRepository.GetByIdAsync(id);
+
+            if (existingEntity == null)
+                return null;
+
+            var occupiedSeats = existingEntity.TotalSeats - existingEntity.AvailableSeats;
+            _mapper.Map(updatedEvent, existingEntity);
+
+            if (updatedEvent.TotalSeats.HasValue)
+            {
+                var newTotal = existingEntity.TotalSeats;
+
+                if (newTotal < occupiedSeats)
+                {
+                    throw new TotalSeatsTooLowException(existingEntity.Title, newTotal, occupiedSeats);
+                }
+
+                existingEntity.AvailableSeats = newTotal - occupiedSeats;
+            }
+
+            await _eventRepository.UpdateAsync(existingEntity);
+            
+            return _mapper.Map<EventDto>(existingEntity);
+        }
+        finally
+        {
+            EventSemaphore.Semaphore.Release();
+        }
+    }
+    
+    /// <inheritdoc />
+    public async Task<EventDto?> UpdateInternal(Guid id, EventDto updatedEvent)
+    {
         var existingEntity = await _eventRepository.GetByIdAsync(id);
         
         if (existingEntity == null)
             return null;
-
-        // Обновляем существующую сущность
+        
         _mapper.Map(updatedEvent, existingEntity);
         await _eventRepository.UpdateAsync(existingEntity);
         

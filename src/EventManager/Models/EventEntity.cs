@@ -29,4 +29,14 @@ public class EventEntity
     /// Время конца события
     /// </summary>
     public DateTime EndDate { get; set; }
+    
+    /// <summary>
+    /// Общее количество мест на событии
+    /// </summary>
+    public int TotalSeats { get; set; }
+    
+    /// <summary>
+    /// Текущее количество свободных мест
+    /// </summary>
+    public int AvailableSeats { get; set; }
 }

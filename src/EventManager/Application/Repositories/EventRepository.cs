@@ -37,6 +37,8 @@ public class EventRepository : IEventRepository
             oldEvent.EndDate = newEvent.EndDate;
             oldEvent.Title = newEvent.Title;
             oldEvent.Description = newEvent.Description;
+            oldEvent.TotalSeats = newEvent.TotalSeats;
+            oldEvent.AvailableSeats = newEvent.AvailableSeats; 
         }
         return Task.CompletedTask;
     }

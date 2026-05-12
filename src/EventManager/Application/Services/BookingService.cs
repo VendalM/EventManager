@@ -1,6 +1,7 @@
 using AutoMapper;
 using EventManager.Application.Interfaces;
 using EventManager.Enums;
+using EventManager.Exceptions;
 using EventManager.Models;
 
 namespace EventManager.Application.Services;
@@ -13,6 +14,7 @@ public class BookingService : IBookingService
     private readonly IMapper _mapper;
     private readonly IEventService _eventService;
     private readonly IBookingRepository _bookingRepository;
+
     
     /// <summary>
     /// Конструктор, который принимает зависимости для работы сервиса бронирования
@@ -30,28 +32,48 @@ public class BookingService : IBookingService
     /// <inheritdoc />
     public async Task<BookingDto?> CreateBookingAsync(Guid eventId)
     {
-        if (!await _eventService.HasEvent(eventId))
+        BookingEntity entity;
+        
+        // Блокируем доступ к ресурсу, чтобы избежать гонки при бронировании последних мест
+        await EventSemaphore.Semaphore.WaitAsync();
+        try
         {
-            return null;
+            var eventForBooking = await _eventService.GetById(eventId);
+            if (eventForBooking == null)
+            {
+                throw new NotFoundException(eventId);
+            }
+            
+            var tryReserve = eventForBooking.TryReserveSeats();
+            if (!tryReserve)
+            {
+                throw new NoAvailableSeatsException(eventForBooking.Title);
+            }
+            
+            await _eventService.UpdateInternal(eventId, eventForBooking);
+
+            entity = new BookingEntity()
+            {
+                Id = Guid.NewGuid(),
+                EventId = eventId,
+                Status = BookingStatus.Pending,
+                CreatedAt = DateTime.Now
+            };
+        
+            await _bookingRepository.AddAsync(entity);
+        } 
+        finally
+        {
+            EventSemaphore.Semaphore.Release();
         }
         
-        var entity = new BookingEntity()
-        {
-            Id = Guid.NewGuid(),
-            EventId = eventId,
-            Status = BookingStatus.Pending,
-            CreatedAt = DateTime.Now
-        };
-        
-        await _bookingRepository.AddAsync(entity);
-        
-        return await Task.FromResult(_mapper.Map<BookingDto>(entity));
+        return _mapper.Map<BookingDto>(entity);
     }
     
     /// <inheritdoc />
     public async Task<BookingDto?> GetBookingByIdAsync(Guid bookingId)
     {
         var entity = await _bookingRepository.GetByIdAsync(bookingId);
-        return await Task.FromResult(entity == null ? null : _mapper.Map<BookingDto>(entity));
+        return _mapper.Map<BookingDto>(entity);
     }
 }
