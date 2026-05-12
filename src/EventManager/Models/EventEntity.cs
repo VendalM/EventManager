@@ -39,4 +39,9 @@ public class EventEntity
     /// Текущее количество свободных мест
     /// </summary>
     public int AvailableSeats { get; set; }
+    
+    /// <summary>
+    /// Список бронирований, связанных с этим событием
+    /// </summary>
+    public List<BookingEntity> Bookings { get; set; }
 }

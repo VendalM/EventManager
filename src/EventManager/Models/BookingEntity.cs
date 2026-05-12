@@ -31,4 +31,9 @@ public class BookingEntity
     /// Дата и время обработки брони
     /// </summary>
     public DateTime? ProcessedAt { get; set; }
+    
+    /// <summary>
+    /// Событие, к которому относится бронь
+    /// </summary>
+    public EventEntity Event { get; set; }
 }
