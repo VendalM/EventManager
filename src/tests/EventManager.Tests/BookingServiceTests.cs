@@ -434,7 +434,7 @@ public class BookingServiceTests
             Id = Guid.NewGuid(),
             EventId = Guid.NewGuid(),
             Status = BookingStatus.Pending,
-            CreatedAt = DateTime.Now.AddMinutes(-5),
+            CreatedAt = DateTime.UtcNow.AddMinutes(-5),
             ProcessedAt = null
         };
         
@@ -444,6 +444,7 @@ public class BookingServiceTests
         // Assert
         Assert.Equal(BookingStatus.Confirmed, booking.Status);
         Assert.NotNull(booking.ProcessedAt);
+        Assert.Equal(DateTimeKind.Utc, booking.ProcessedAt!.Value.Kind);
     }
 
     /// <summary>
@@ -458,7 +459,7 @@ public class BookingServiceTests
             Id = Guid.NewGuid(),
             EventId = Guid.NewGuid(),
             Status = BookingStatus.Pending,
-            CreatedAt = DateTime.Now.AddMinutes(-5),
+            CreatedAt = DateTime.UtcNow.AddMinutes(-5),
             ProcessedAt = null
         };
         
@@ -468,6 +469,7 @@ public class BookingServiceTests
         // Assert
         Assert.Equal(BookingStatus.Rejected, booking.Status);
         Assert.NotNull(booking.ProcessedAt);
+        Assert.Equal(DateTimeKind.Utc, booking.ProcessedAt!.Value.Kind);
     }
 
     /// <summary>

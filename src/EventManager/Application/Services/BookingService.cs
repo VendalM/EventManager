@@ -57,7 +57,7 @@ public class BookingService : IBookingService
                 Id = Guid.NewGuid(),
                 EventId = eventId,
                 Status = BookingStatus.Pending,
-                CreatedAt = DateTime.Now
+                CreatedAt = DateTime.UtcNow
             };
         
             await _bookingRepository.AddAsync(entity);

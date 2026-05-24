@@ -38,7 +38,7 @@ public class BookingDto
     public void Confirm()
     {
         Status = BookingStatus.Confirmed;
-        ProcessedAt = DateTime.Now;
+        ProcessedAt = DateTime.UtcNow;
     }
     
     /// <summary>
@@ -47,6 +47,6 @@ public class BookingDto
     public void Reject()
     {
         Status = BookingStatus.Rejected;
-        ProcessedAt = DateTime.Now;
+        ProcessedAt = DateTime.UtcNow;
     }
 }
