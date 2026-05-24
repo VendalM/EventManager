@@ -9,6 +9,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{17FE99FB
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EventManager.Tests", "tests\EventManager.Tests\EventManager.Tests.csproj", "{10720178-EE47-4976-BA15-D2A9EACB4806}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EventApi.IntegrationTests", "tests\EventApi.IntegrationTests\EventApi.IntegrationTests.csproj", "{0B19385E-AD8D-4C5E-8DB1-215AF5BFFC9D}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -26,8 +28,13 @@ Global
 		{10720178-EE47-4976-BA15-D2A9EACB4806}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{10720178-EE47-4976-BA15-D2A9EACB4806}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{10720178-EE47-4976-BA15-D2A9EACB4806}.Release|Any CPU.Build.0 = Release|Any CPU
+		{0B19385E-AD8D-4C5E-8DB1-215AF5BFFC9D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0B19385E-AD8D-4C5E-8DB1-215AF5BFFC9D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0B19385E-AD8D-4C5E-8DB1-215AF5BFFC9D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0B19385E-AD8D-4C5E-8DB1-215AF5BFFC9D}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{10720178-EE47-4976-BA15-D2A9EACB4806} = {17FE99FB-44B2-4227-ABBF-8FB5A6E0C0C5}
+		{0B19385E-AD8D-4C5E-8DB1-215AF5BFFC9D} = {17FE99FB-44B2-4227-ABBF-8FB5A6E0C0C5}
 	EndGlobalSection
 EndGlobal
