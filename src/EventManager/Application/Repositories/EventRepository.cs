@@ -1,5 +1,7 @@
 using EventManager.Application.Interfaces;
+using EventManager.Infrastructure.DataAccess;
 using EventManager.Models;
+using Microsoft.EntityFrameworkCore;
 
 namespace EventManager.Application.Repositories;
 
@@ -9,28 +11,35 @@ namespace EventManager.Application.Repositories;
 public class EventRepository : IEventRepository
 {
     /// <summary>
-    /// Все доступные события (временное хранилище)
+    /// Контекст базы данных для доступа к данным событий.
     /// </summary>
-    private static readonly List<EventEntity> Events = new();
+    private readonly AppDbContext _context;
     
-    /// <inheritdoc />
-    public Task<EventEntity?> GetByIdAsync(Guid id)
+    /// <summary>
+    /// Конструктор, который принимает контекст базы данных для взаимодействия с данными событий
+    /// </summary>
+    public EventRepository(AppDbContext context)
     {
-        var findEvent = Events.FirstOrDefault(b => b.Id == id);
-        return Task.FromResult(findEvent);
+        _context = context;
     }
     
     /// <inheritdoc />
-    public Task AddAsync(EventEntity newEvent)
+    public async Task<EventEntity?> GetByIdAsync(Guid id)
     {
-        Events.Add(newEvent);
-        return Task.CompletedTask;
+        return await _context.Events.FirstOrDefaultAsync(b => b.Id == id);
+    }
+    
+    /// <inheritdoc />
+    public async Task AddAsync(EventEntity newEvent)
+    {
+        _context.Events.Add(newEvent);
+        await _context.SaveChangesAsync();
     }
 
     /// <inheritdoc />
-    public Task UpdateAsync(EventEntity newEvent)
+    public async Task UpdateAsync(EventEntity newEvent)
     {
-        var oldEvent = Events.FirstOrDefault(b => b.Id == newEvent.Id);
+        var oldEvent = await _context.Events.FirstOrDefaultAsync(b => b.Id == newEvent.Id);
         if (oldEvent != null)
         {
             oldEvent.StartDate = newEvent.StartDate;
@@ -40,24 +49,30 @@ public class EventRepository : IEventRepository
             oldEvent.TotalSeats = newEvent.TotalSeats;
             oldEvent.AvailableSeats = newEvent.AvailableSeats; 
         }
-        return Task.CompletedTask;
+        await _context.SaveChangesAsync();
     }
     
     /// <inheritdoc />
     public Task<List<EventEntity>> GetAllAsync()
     {
-        return Task.FromResult(Events.ToList());
+        return _context.Events.ToListAsync();
     }
 
     /// <inheritdoc />
-    public Task<bool> RemoveAsync(Guid id)
+    public async Task<bool> RemoveAsync(Guid id)
     {
-        return Task.FromResult(Events.RemoveAll(e => e.Id == id) > 0);
+        var entity = await _context.Events.FindAsync(id);
+        if (entity == null)
+            return false;
+
+        _context.Events.Remove(entity);
+        await _context.SaveChangesAsync();
+        return true;
     }
 
     /// <inheritdoc />
     public Task<bool> HasEventAsync(Guid id)
     {
-        return Task.FromResult(Events.Any(e => e.Id == id));
+        return _context.Events.AnyAsync(e => e.Id == id);
     }
 }

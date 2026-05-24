@@ -1,5 +1,7 @@
 using EventManager.Application.Interfaces;
+using EventManager.Infrastructure.DataAccess;
 using EventManager.Models;
+using Microsoft.EntityFrameworkCore;
 
 namespace EventManager.Application.Repositories;
 
@@ -8,26 +10,36 @@ namespace EventManager.Application.Repositories;
 /// </summary>
 public class BookingRepository : IBookingRepository
 {
-    private static readonly List<BookingEntity> Bookings = new();
+    /// <summary>
+    /// Контекст базы данных для доступа к данным бронирования.
+    /// </summary>
+    private readonly AppDbContext _context;
+
+    /// <summary>
+    /// Конструктор, который принимает контекст базы данных для взаимодействия с данными бронирования
+    /// </summary>
+    public BookingRepository(AppDbContext context)
+    {
+        _context = context;
+    }
     
     /// <inheritdoc />
     public Task<BookingEntity?> GetByIdAsync(Guid id)
     {
-        var booking = Bookings.FirstOrDefault(b => b.Id == id);
-        return Task.FromResult(booking);
+        return _context.Bookings.FirstOrDefaultAsync(b => b.Id == id);
     }
     
     /// <inheritdoc />
-    public Task AddAsync(BookingEntity booking)
+    public async Task AddAsync(BookingEntity booking)
     {
-        Bookings.Add(booking);
-        return Task.CompletedTask;
+        _context.Bookings.Add(booking);
+        await _context.SaveChangesAsync();
     }
 
     /// <inheritdoc />
-    public Task UpdateAsync(BookingEntity newBooking)
+    public async Task UpdateAsync(BookingEntity newBooking)
     {
-        var oldBooking = Bookings.FirstOrDefault(b => b.Id == newBooking.Id);
+        var oldBooking = await _context.Bookings.FirstOrDefaultAsync(b => b.Id == newBooking.Id);
         if (oldBooking != null)
         {
             oldBooking.EventId = newBooking.EventId;
@@ -35,12 +47,12 @@ public class BookingRepository : IBookingRepository
             oldBooking.CreatedAt = newBooking.CreatedAt;
             oldBooking.ProcessedAt = newBooking.ProcessedAt;
         }
-        return Task.CompletedTask;
+        await _context.SaveChangesAsync();
     }
     
     /// <inheritdoc />
     public Task<List<BookingEntity>> GetAllAsync()
     {
-        return Task.FromResult(Bookings.ToList());
+        return _context.Bookings.ToListAsync();
     }
 }

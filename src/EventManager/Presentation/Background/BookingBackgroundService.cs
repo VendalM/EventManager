@@ -67,7 +67,7 @@ public class BookingBackgroundService : BackgroundService
         _logger.LogInformation("Найдено {Count} бронирований со статусом Pending для обработки", pending.Count);
         
         var eventRepository = scope.ServiceProvider.GetRequiredService<IEventRepository>();
-        
+
         var tasks = pending.Select(async booking => await ProcessBooking(eventRepository, bookingRepository, _mapper.Map<BookingDto>(booking), stoppingToken));
         await Task.WhenAll(tasks); 
     }

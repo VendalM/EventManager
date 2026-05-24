@@ -15,18 +15,42 @@ public class EventConfiguration : IEntityTypeConfiguration<EventEntity>
     /// <param name="builder">Объект для настройки модели EventEntity</param>
     public void Configure(EntityTypeBuilder<EventEntity> builder)
     {
-        builder.ToTable("events", "catalog");
-        builder.HasKey(b => b.Id);
-        builder.Property(b => b.Id).ValueGeneratedNever();
-        builder.Property(b => b.Title).IsRequired().HasMaxLength(200);
-        builder.Property(b => b.Description).HasMaxLength(1000);
-        builder.Property(b => b.StartDate).IsRequired();
-        builder.Property(b => b.EndDate).IsRequired();
-        builder.Property(b => b.TotalSeats).IsRequired();
-        builder.Property(b => b.AvailableSeats).IsRequired();
+        builder.ToTable("events");
+
+        builder.HasKey(e => e.Id);
+
+        builder.Property(e => e.Id)
+            .HasColumnName("id")
+            .ValueGeneratedNever();
+
+        builder.Property(e => e.Title)
+            .HasColumnName("title")
+            .IsRequired()
+            .HasMaxLength(200);
+
+        builder.Property(e => e.Description)
+            .HasColumnName("description")
+            .HasMaxLength(2000);
+
+        builder.Property(e => e.StartDate)
+            .HasColumnName("start_at")
+            .IsRequired();
+
+        builder.Property(e => e.EndDate)
+            .HasColumnName("end_at")
+            .IsRequired();
+
+        builder.Property(e => e.TotalSeats)
+            .HasColumnName("total_seats")
+            .IsRequired();
+
+        builder.Property(e => e.AvailableSeats)
+            .HasColumnName("available_seats")
+            .IsRequired();
+
         builder.HasMany(e => e.Bookings)
             .WithOne(b => b.Event)
             .HasForeignKey(b => b.EventId)
-            .OnDelete(DeleteBehavior.Restrict);
+            .OnDelete(DeleteBehavior.Cascade);
     }
 }
