@@ -1,7 +1,7 @@
-using EventManager.Application.Repositories;
-using EventManager.Enums;
-using EventManager.Infrastructure.DataAccess;
-using EventManager.Models;
+using Domain.Enums;
+using Domain.Models;
+using Infrastructure.DataAccess;
+using Infrastructure.Repositories;
 using Microsoft.EntityFrameworkCore;
 using Testcontainers.PostgreSql;
 
