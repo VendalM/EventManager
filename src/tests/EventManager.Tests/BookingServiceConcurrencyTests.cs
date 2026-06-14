@@ -1,9 +1,11 @@
+using Application.Interfaces;
+using Application.Models;
+using Application.Services;
 using AutoMapper;
+using Domain.Enums;
+using Domain.Exceptions;
+using Domain.Models;
 using EventManager.Application.Interfaces;
-using EventManager.Application.Services;
-using EventManager.Enums;
-using EventManager.Models;
-using EventManager.Exceptions;
 using Moq;
 
 namespace EventManager.Tests;

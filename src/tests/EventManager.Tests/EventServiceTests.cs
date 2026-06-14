@@ -1,7 +1,8 @@
+using Application.Interfaces;
+using Application.Models;
+using Application.Services;
 using AutoMapper;
-using EventManager.Application.Interfaces;
-using EventManager.Application.Services;
-using EventManager.Models;
+using Domain.Models;
 using EventManager.Tests.TestData;
 using Moq;
 
