@@ -1,0 +1,63 @@
+using Application.Models;
+
+namespace EventManager.Application.Interfaces;
+
+/// <summary>
+/// Контракт для логики сервиса обработки событий
+/// </summary>
+public interface IEventService
+{
+    /// <summary>
+    /// Получить все доступные события
+    /// </summary>
+    /// <returns>События</returns>
+    /// @param title Фильтр по названию события (необязательный)
+    /// @param from Фильтр по дате начала события (необязательный)
+    /// @param to Фильтр по дате окончания события (необязательный)
+    /// @param page Номер страницы для пагинации (по умолчанию 1)
+    /// @param pageSize Количество элементов на странице для пагинации (по умолчанию 10)
+    public Task<PaginatedResult<EventDto>> GetAllEvents(string? title, DateTime? from, DateTime? to, int page = 1, int pageSize = 10);
+
+    /// <summary>
+    /// Получить событие по идентификатору
+    /// </summary>
+    /// <param name="id">Идентификатор</param>
+    /// <returns>Найденное событие</returns>
+    public Task<EventDto?> GetById(Guid id);
+
+    /// <summary>
+    /// Создать событие
+    /// </summary>
+    /// <param name="newEvent">Новое событие</param>
+    /// <returns>Созданное событие</returns>
+    public Task<EventDto> Create(EventSaveDto newEvent);
+
+    /// <summary>
+    /// Обновить событие
+    /// </summary>
+    /// <param name="id">Идентификатор</param>
+    /// <param name="updatedEvent">Обновляемое событие</param>
+    /// <returns>Удалось ли обновить событие?</returns>
+    public Task<EventDto?> Update(Guid id, EventSaveDto updatedEvent);
+    
+    /// <summary>
+    /// Внутреннее обновление (для бронирований)
+    /// </summary>
+    /// <param name="id">Идентификатор</param>
+    /// <param name="updatedEvent">Обновляемое событие</param>
+    /// <returns>Удалось ли обновить событие?</returns>
+    public Task<EventDto?> UpdateInternal(Guid id, EventDto updatedEvent);
+
+    /// <summary>
+    /// Удалить событие
+    /// </summary>
+    /// <param name="id">Идентификатор</param>
+    /// <returns>Удалось ли удалить событие?</returns>
+    public Task<bool> Delete(Guid id);
+    
+    /// <summary>
+    /// Проверить, существует ли событие с данным идентификатором
+    /// </summary>
+    /// <param name="id">Идентификатор</param>
+    public Task<bool> HasEvent(Guid id);
+}

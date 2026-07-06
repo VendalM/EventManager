@@ -1,4 +1,5 @@
-using EventManager.Models;
+
+using Application.Models;
 
 namespace EventManager.Tests.TestData;
 

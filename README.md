@@ -61,11 +61,12 @@
 
 ## Как это устроено внутри?
 
-Проект разделен на логические части, чтобы код был чистым и понятным:
-*   **Модели (`EventManager.Models`)** — описывают, как выглядит событие и DTO для обмена данными.
-*   **Приложение (`EventManager.Application`)** — содержит всю умную логику по работе с событиями (сервисы, интерфейсы).
-*   **Презентация (`EventManager.Presentation`)** — отвечает за обработку запросов, Swagger и глобальную обработку ошибок.
-*   **Инфраструктура (`EventManager.Infrastructure`)** — доступ к данным через EF Core и PostgreSQL.
+Проект разделён на слои согласно чистой архитектуре:
+
+- **Domain** — ядро бизнес-логики: сущности `Event`, `Booking`, value objects, доменные исключения. Не зависит от других слоёв.
+- **Application** — сценарии использования (use cases), DTO, интерфейсы репозиториев (порты), сервисы приложения, исключения прикладного уровня. Зависит только от Domain.
+- **Infrastructure** — реализация портов: репозитории на Entity Framework Core, `AppDbContext`, миграции, конфигурации маппинга (AutoMapper). Зависит от Application и Domain.
+- **Presentation** — точка входа (веб-проект ASP.NET Core): контроллеры, middleware, Swagger, регистрация зависимостей, фоновый сервис обработки бронирований. Зависит от Application и Infrastructure.
 
 ### Обработка ошибок
 
@@ -155,14 +156,15 @@ Middleware глобальной обработки исключений пере
 
 ```bash
 dotnet test tests/EventApi.IntegrationTests
+```
 
 ## Запуск
 
-Для API используется PostgreSQL. По умолчанию строка подключения берётся из `EventManager/appsettings.json` (`ConnectionStrings:Default`).
+Для API используется PostgreSQL. По умолчанию строка подключения берётся из `src/Presentation/appsettings.json` (`ConnectionStrings:Default`).
 
 ```bash
 dotnet restore
-dotnet run --project EventManager/EventManager.csproj
+dotnet run --project src/Presentation/Presentation.csproj
 ```
 
 Swagger доступен в Development-среде (по профилю запуска: `https://localhost:7013/swagger` или `http://localhost:5068/swagger`).
@@ -187,9 +189,10 @@ dotnet test --filter "GetAllEvents_FilterByTitle"
 
 ## Миграции базы данных
 
-Схема базы данных управляется через миграции Entity Framework Core. Миграции позволяют обновлять структуру БД без потери данных (при корректном применении).
-
-### Создание новой миграции
-
 ```bash
-dotnet ef migrations add ИмяМиграции --project EventManager.Infrastructure --startup-project EventManager
+# Создание новой миграции
+dotnet ef migrations add InitialCreate --project src/Infrastructure --startup-project src/Presentation
+
+# Применение миграций к базе данных
+dotnet ef database update --project src/Infrastructure --startup-project src/Presentation
+```

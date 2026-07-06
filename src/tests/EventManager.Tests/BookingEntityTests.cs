@@ -1,5 +1,7 @@
-using EventManager.Enums;
-using EventManager.Models;
+
+
+using Domain.Enums;
+using Domain.Models;
 
 namespace EventManager.Tests;
 
