@@ -1,3 +1,4 @@
+using Application.Models;
 using Domain.Models;
 using Microsoft.EntityFrameworkCore;
 
@@ -26,6 +27,11 @@ public class AppDbContext : DbContext
     /// Таблица бронирований
     /// </summary>
     public DbSet<BookingEntity> Bookings => Set<BookingEntity>();
+    
+    /// <summary>
+    /// Таблица пользователей
+    /// </summary>
+    public DbSet<UserDto> Users => Set<UserDto>();
     
     /// <summary>
     /// Объявление правил создания таблиц

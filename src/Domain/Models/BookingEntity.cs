@@ -18,6 +18,11 @@ public class BookingEntity
     public Guid EventId { get; set; }
     
     /// <summary>
+    /// Идентификатор пользователя, который создал бронь
+    /// </summary>
+    public Guid UserId { get; set; }
+    
+    /// <summary>
     /// Текущий статус брони
     /// </summary>
     public BookingStatus Status { get; set; }
@@ -36,4 +41,9 @@ public class BookingEntity
     /// Событие, к которому относится бронь
     /// </summary>
     public EventEntity Event { get; set; }
+    
+    /// <summary>
+    /// Пользователь, создавший бронь
+    /// </summary>
+    public UserEntity User { get; set; }
 }
