@@ -1,17 +1,17 @@
-namespace Application.Enums;
+namespace Domain.Enums;
 
 /// <summary>
-/// Роли
+/// Роли пользователей.
 /// </summary>
 public enum Roles
 {
     /// <summary>
-    /// Пользователь
+    /// Пользователь.
     /// </summary>
     User,
     
     /// <summary>
-    /// Администратор
+    /// Администратор.
     /// </summary>
     Admin
 }

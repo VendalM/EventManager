@@ -1,4 +1,3 @@
-using Application.Models;
 using Domain.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
@@ -28,12 +27,12 @@ public class UserConfiguration: IEntityTypeConfiguration<UserEntity>
             .HasColumnName("login")
             .IsRequired();
         
-        builder.Property(b => b.Password)
-            .HasColumnName("password")
+        builder.Property(b => b.PasswordHash)
+            .HasColumnName("password_hash")
             .IsRequired();
 
         builder.Property(b => b.Role)
-            .HasColumnName("status")
+            .HasColumnName("role")
             .IsRequired()
             .HasConversion<string>()
             .HasMaxLength(20);

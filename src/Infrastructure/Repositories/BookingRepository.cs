@@ -46,6 +46,7 @@ public class BookingRepository : IBookingRepository
         if (oldBooking != null)
         {
             oldBooking.EventId = newBooking.EventId;
+            oldBooking.UserId = newBooking.UserId;
             oldBooking.Status = newBooking.Status;
             oldBooking.CreatedAt = NormalizeToUtc(newBooking.CreatedAt);
             oldBooking.ProcessedAt = NormalizeToUtc(newBooking.ProcessedAt);

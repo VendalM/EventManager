@@ -33,7 +33,7 @@ public class BookingService : IBookingService
     }
     
     /// <inheritdoc />
-    public async Task<BookingDto?> CreateBookingAsync(Guid eventId)
+    public async Task<BookingDto?> CreateBookingAsync(Guid eventId, Guid userId)
     {
         BookingEntity entity;
         
@@ -59,6 +59,7 @@ public class BookingService : IBookingService
             {
                 Id = Guid.NewGuid(),
                 EventId = eventId,
+                UserId = userId,
                 Status = BookingStatus.Pending,
                 CreatedAt = DateTime.UtcNow
             };

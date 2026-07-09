@@ -1,4 +1,4 @@
-using Application.Enums;
+using Domain.Enums;
 
 namespace Application.Models;
 
@@ -17,7 +17,7 @@ public class UserDto
     /// <summary>
     /// Хэш пароля
     /// </summary>
-    public string Password { get; set; }
+    public string PasswordHash { get; set; }
     
     /// <summary>
     /// Роль

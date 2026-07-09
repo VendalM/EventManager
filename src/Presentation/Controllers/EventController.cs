@@ -92,14 +92,14 @@ public class EventController : ControllerBase
     /// </summary>
     [HttpPost("/events/{id}/book")]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
-    public async Task<IActionResult> CreateBooking(Guid id)
+    public async Task<IActionResult> CreateBooking(Guid id, [FromQuery] Guid userId)
     {
         if (!await _eventService.HasEvent(id))
         {
             throw new NotFoundException(id);
         }
         
-        var result = await _bookingService.CreateBookingAsync(id);
+        var result = await _bookingService.CreateBookingAsync(id, userId);
         
         if (result == null)
         {

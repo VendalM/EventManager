@@ -1,4 +1,4 @@
-using Application.Enums;
+using Domain.Enums;
 
 namespace Domain.Models;
 
@@ -20,7 +20,7 @@ public class UserEntity
     /// <summary>
     /// Хэш пароля
     /// </summary>
-    public string Password { get; set; }
+    public string PasswordHash { get; set; }
     
     /// <summary>
     /// Роль

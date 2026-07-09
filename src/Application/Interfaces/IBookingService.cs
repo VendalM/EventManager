@@ -11,7 +11,8 @@ public interface IBookingService
     /// Создание брони для указанного события
     /// </summary>
     /// <param name="eventId">Идентификатор события, для которого создается бронь</param>
-    Task<BookingDto?> CreateBookingAsync(Guid eventId);
+    /// <param name="userId">Идентификатор пользователя, создающего бронь.</param>
+    Task<BookingDto?> CreateBookingAsync(Guid eventId, Guid userId);
     
     /// <summary>
     /// Получение брони по идентификатору

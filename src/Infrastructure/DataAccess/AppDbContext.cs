@@ -1,4 +1,3 @@
-using Application.Models;
 using Domain.Models;
 using Microsoft.EntityFrameworkCore;
 
@@ -31,7 +30,7 @@ public class AppDbContext : DbContext
     /// <summary>
     /// Таблица пользователей
     /// </summary>
-    public DbSet<UserDto> Users => Set<UserDto>();
+    public DbSet<UserEntity> Users => Set<UserEntity>();
     
     /// <summary>
     /// Объявление правил создания таблиц
