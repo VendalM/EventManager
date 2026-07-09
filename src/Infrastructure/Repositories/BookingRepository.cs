@@ -1,4 +1,5 @@
 using Application.Interfaces;
+using Domain.Enums;
 using Domain.Models;
 using Infrastructure.DataAccess;
 using Microsoft.EntityFrameworkCore;
@@ -14,6 +15,11 @@ public class BookingRepository : IBookingRepository
     /// Контекст базы данных для доступа к данным бронирования.
     /// </summary>
     private readonly AppDbContext _context;
+
+    /// <summary>
+    /// Лимит броней для пользователя.
+    /// </summary>
+    private const int ActiveBookingsLimit = 10;
 
     /// <summary>
     /// Конструктор, который принимает контекст базы данных для взаимодействия с данными бронирования
@@ -58,6 +64,22 @@ public class BookingRepository : IBookingRepository
     public Task<List<BookingEntity>> GetAllAsync()
     {
         return _context.Bookings.ToListAsync();
+    }
+
+    /// <inheritdoc />
+    public async Task<bool> HasReachedActiveBookingsLimitAsync(Guid userId)
+    {
+        var bookingCount = await _context.Bookings
+            .CountAsync(b => b.UserId == userId &&
+                             (b.Status == BookingStatus.Pending || b.Status == BookingStatus.Confirmed));
+
+        return bookingCount >= ActiveBookingsLimit;
+    }
+
+    /// <inheritdoc />
+    public int GetActiveBookingsLimit()
+    {
+        return ActiveBookingsLimit;
     }
 
     /// <summary>

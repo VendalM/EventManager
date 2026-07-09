@@ -31,6 +31,11 @@ public class AppDbContext : DbContext
     /// Таблица пользователей
     /// </summary>
     public DbSet<UserEntity> Users => Set<UserEntity>();
+
+    /// <summary>
+    /// Таблица refresh-токенов.
+    /// </summary>
+    public DbSet<RefreshTokenEntity> RefreshTokens => Set<RefreshTokenEntity>();
     
     /// <summary>
     /// Объявление правил создания таблиц

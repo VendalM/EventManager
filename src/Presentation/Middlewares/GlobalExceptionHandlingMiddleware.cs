@@ -84,6 +84,10 @@ public class GlobalExceptionHandlingMiddleware
             ValidationException ve => StatusCodes.Status400BadRequest,
             NotFoundException nfe => StatusCodes.Status404NotFound,
             NoAvailableSeatsException nfe => StatusCodes.Status409Conflict,
+            PastEventBookingException pbe => StatusCodes.Status400BadRequest,
+            ActiveBookingsLimitExceededException able => StatusCodes.Status409Conflict,
+            OperationForbiddenException ofe => StatusCodes.Status403Forbidden,
+            UnauthorizedAccessException uae => StatusCodes.Status401Unauthorized,
             _ => StatusCodes.Status500InternalServerError
         };
 }

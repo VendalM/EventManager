@@ -5,22 +5,17 @@ namespace Application.Models;
 public class UserDto
 {
     /// <summary>
-    /// Уникальный идентификатор пользователя
+    /// Уникальный идентификатор пользователя.
     /// </summary>
     public Guid Id { get; set; }
     
     /// <summary>
-    /// Логин
+    /// Логин.
     /// </summary>
-    public string Login { get; set; }
-    
+    public string Login { get; set; } = string.Empty;
+
     /// <summary>
-    /// Хэш пароля
-    /// </summary>
-    public string PasswordHash { get; set; }
-    
-    /// <summary>
-    /// Роль
+    /// Роль.
     /// </summary>
     public Roles Role { get; set; }
 }

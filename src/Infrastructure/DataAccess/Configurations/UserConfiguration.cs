@@ -19,17 +19,22 @@ public class UserConfiguration: IEntityTypeConfiguration<UserEntity>
 
         builder.HasKey(b => b.Id);
 
+        builder.HasIndex(b => b.Login)
+            .IsUnique();
+
         builder.Property(b => b.Id)
             .HasColumnName("id")
             .ValueGeneratedNever();
 
         builder.Property(b => b.Login)
             .HasColumnName("login")
-            .IsRequired();
-        
+            .IsRequired()
+            .HasMaxLength(100);
+
         builder.Property(b => b.PasswordHash)
             .HasColumnName("password_hash")
-            .IsRequired();
+            .IsRequired()
+            .HasMaxLength(64);
 
         builder.Property(b => b.Role)
             .HasColumnName("role")
