@@ -11,95 +11,61 @@ using Moq;
 namespace EventManager.Tests;
 
 /// <summary>
-/// Набор тестов для проверки конкурентности при бронировании
+/// Набор тестов для проверки конкурентного создания броней.
 /// </summary>
 public class BookingServiceConcurrencyTests
 {
     private readonly IMapper _mapper;
-    
+
     public BookingServiceConcurrencyTests()
     {
         var config = new MapperConfiguration(cfg =>
         {
-            cfg.CreateMap<BookingEntity, BookingDto>();
+            cfg.CreateMap<BookingEntity, BookingDto>().ReverseMap();
         });
+
         _mapper = config.CreateMapper();
     }
-    
-    private (BookingService service, Mock<IBookingRepository> mockRepo, Mock<IEventService> mockEvent) 
-        CreateBookingService()
-    {
-        var mockRepo = new Mock<IBookingRepository>();
-        var mockEvent = new Mock<IEventService>();
-        var service = new BookingService(_mapper, mockEvent.Object, mockRepo.Object);
-        
-        return (service, mockRepo, mockEvent);
-    }
-    
+
     /// <summary>
-    /// Тест на защиту от овербукинга:
-    /// Дано: событие на 5 мест, 20 конкурентных запросов.
-    /// Ожидается: ровно 5 успешных броней, 15 — NoAvailableSeatsException,
-    /// AvailableSeats = 0.
+    /// Проверяет, что параллельные запросы не могут создать броней больше, чем свободных мест.
     /// </summary>
     [Fact]
     public async Task CreateBookingAsync_ConcurrentRequests_PreventsOverbooking()
     {
-        // Arrange
         var totalSeats = 5;
         var concurrentRequests = 20;
         var eventId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
         var currentSeats = totalSeats;
-        
-        var (service, mockRepo, mockEvent) = CreateBookingService();
-        
-        // Настраиваем моки с задержкой для имитации реальной конкурентности
-        mockEvent.Setup(x => x.HasEvent(eventId)).ReturnsAsync(true);
-        
-        mockEvent.Setup(x => x.GetById(eventId))
-            .ReturnsAsync(() => new EventDto 
-            { 
-                Id = eventId, 
-                Title = "Test Event",
-                TotalSeats = totalSeats,
-                AvailableSeats = currentSeats 
-            });
-        
-        mockEvent.Setup(x => x.UpdateInternal(eventId, It.IsAny<EventDto>()))
-            .ReturnsAsync((Guid id, EventDto dto) => 
+        var (service, _, eventService, _) = CreateService();
+        var exceptions = new List<Exception>();
+        var successfulBookings = new List<BookingDto>();
+        var lockObject = new object();
+
+        eventService.Setup(x => x.GetById(eventId))
+            .ReturnsAsync(() => CreateFutureEvent(eventId, totalSeats, currentSeats));
+        eventService.Setup(x => x.UpdateInternal(eventId, It.IsAny<EventDto>()))
+            .ReturnsAsync((Guid _, EventDto dto) =>
             {
-                // Имитируем задержку при обновлении
                 Thread.Sleep(10);
                 currentSeats = dto.AvailableSeats;
                 return dto;
             });
-        
-        mockRepo.Setup(x => x.AddAsync(It.IsAny<BookingEntity>()))
-            .Returns(Task.CompletedTask)
-            .Callback<BookingEntity>(booking => 
-            {
-                booking.Id = Guid.NewGuid();
-            });
-        
-        // Act - запускаем конкурентные запросы
-        var tasks = new List<Task<BookingDto?>>();
-        var exceptions = new List<Exception>();
-        var successfulBookings = new List<BookingDto>();
-        var lockObject = new object();
-        
-        for (int i = 0; i < concurrentRequests; i++)
-        {
-            tasks.Add(Task.Run(async () =>
+
+        var tasks = Enumerable.Range(0, concurrentRequests)
+            .Select(_ => Task.Run(async () =>
             {
                 try
                 {
-                    var result = await service.CreateBookingAsync(eventId);
+                    var result = await service.CreateBookingAsync(eventId, userId);
                     lock (lockObject)
                     {
                         if (result != null)
+                        {
                             successfulBookings.Add(result);
+                        }
                     }
-                    return result;
                 }
                 catch (Exception ex)
                 {
@@ -107,102 +73,105 @@ public class BookingServiceConcurrencyTests
                     {
                         exceptions.Add(ex);
                     }
-                    return null;
                 }
-            }));
-        }
-        
-        // Ждём завершения всех задач
+            }))
+            .ToList();
+
         await Task.WhenAll(tasks);
-        
-        // Assert
+
         Assert.Equal(totalSeats, successfulBookings.Count);
         Assert.Equal(concurrentRequests - totalSeats, exceptions.Count);
         Assert.All(exceptions, ex => Assert.IsType<NoAvailableSeatsException>(ex));
         Assert.Equal(0, currentSeats);
-        
-        var uniqueIds = successfulBookings.Select(b => b.Id).Distinct().Count();
-        Assert.Equal(totalSeats, uniqueIds);
+        Assert.Equal(totalSeats, successfulBookings.Select(b => b.Id).Distinct().Count());
+        Assert.All(successfulBookings, b => Assert.Equal(userId, b.UserId));
     }
-    
+
     /// <summary>
-    /// Тест на уникальность Id при конкурентных запросах:
-    /// Дано: событие на 10 мест, 10 одновременных запросов.
-    /// Ожидается: 10 броней с уникальными Id.
+    /// Проверяет, что параллельно созданные брони получают уникальные идентификаторы.
     /// </summary>
     [Fact]
     public async Task CreateBookingAsync_ConcurrentRequests_AllBookingsHaveUniqueIds()
     {
-        // Arrange
         var totalSeats = 10;
         var concurrentRequests = 10;
         var eventId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
         var currentSeats = totalSeats;
-        
-        var (service, mockRepo, mockEvent) = CreateBookingService();
-        
-        mockEvent.Setup(x => x.HasEvent(eventId)).ReturnsAsync(true);
-        
-        mockEvent.Setup(x => x.GetById(eventId))
-            .ReturnsAsync(() => new EventDto 
-            { 
-                Id = eventId, 
-                Title = "Test Event",
-                TotalSeats = totalSeats,
-                AvailableSeats = currentSeats 
-            });
-        
-        mockEvent.Setup(x => x.UpdateInternal(eventId, It.IsAny<EventDto>()))
-            .ReturnsAsync((Guid id, EventDto dto) => 
+        var (service, _, eventService, _) = CreateService();
+        var successfulBookings = new List<BookingDto>();
+        var lockObject = new object();
+
+        eventService.Setup(x => x.GetById(eventId))
+            .ReturnsAsync(() => CreateFutureEvent(eventId, totalSeats, currentSeats));
+        eventService.Setup(x => x.UpdateInternal(eventId, It.IsAny<EventDto>()))
+            .ReturnsAsync((Guid _, EventDto dto) =>
             {
                 Thread.Sleep(5);
                 currentSeats = dto.AvailableSeats;
                 return dto;
             });
-        
-        var usedIds = new HashSet<Guid>();
-        mockRepo.Setup(x => x.AddAsync(It.IsAny<BookingEntity>()))
-            .Returns(Task.CompletedTask)
-            .Callback<BookingEntity>(booking => 
+
+        var tasks = Enumerable.Range(0, concurrentRequests)
+            .Select(_ => Task.Run(async () =>
             {
-                // Генерируем уникальный Id
-                var newId = Guid.NewGuid();
-                while (usedIds.Contains(newId))
-                {
-                    newId = Guid.NewGuid();
-                }
-                usedIds.Add(newId);
-                booking.Id = newId;
-            });
-        
-        // Act
-        var tasks = new List<Task<BookingDto?>>();
-        var successfulBookings = new List<BookingDto>();
-        var lockObject = new object();
-        
-        for (int i = 0; i < concurrentRequests; i++)
-        {
-            tasks.Add(Task.Run(async () =>
-            {
-                var result = await service.CreateBookingAsync(eventId);
+                var result = await service.CreateBookingAsync(eventId, userId);
                 lock (lockObject)
                 {
                     if (result != null)
+                    {
                         successfulBookings.Add(result);
+                    }
                 }
-                return result;
-            }));
-        }
-        
+            }))
+            .ToList();
+
         await Task.WhenAll(tasks);
-        
-        // Assert
+
         Assert.Equal(concurrentRequests, successfulBookings.Count);
-        
-        var uniqueIds = successfulBookings.Select(b => b.Id).Distinct().Count();
-        Assert.Equal(concurrentRequests, uniqueIds);
-        
+        Assert.Equal(concurrentRequests, successfulBookings.Select(b => b.Id).Distinct().Count());
         Assert.All(successfulBookings, b => Assert.Equal(eventId, b.EventId));
+        Assert.All(successfulBookings, b => Assert.Equal(userId, b.UserId));
         Assert.All(successfulBookings, b => Assert.Equal(BookingStatus.Pending, b.Status));
+    }
+
+    private (BookingService service,
+        Mock<IBookingRepository> bookingRepository,
+        Mock<IEventService> eventService,
+        Mock<IUserService> userService) CreateService()
+    {
+        var bookingRepository = new Mock<IBookingRepository>();
+        var eventService = new Mock<IEventService>();
+        var userService = new Mock<IUserService>();
+
+        bookingRepository.Setup(x => x.HasReachedActiveBookingsLimitAsync(It.IsAny<Guid>()))
+            .ReturnsAsync(false);
+        bookingRepository.Setup(x => x.GetActiveBookingsLimit()).Returns(10);
+        bookingRepository.Setup(x => x.AddAsync(It.IsAny<BookingEntity>()))
+            .Returns(Task.CompletedTask);
+        userService.Setup(x => x.GetByIdAsync(It.IsAny<Guid>()))
+            .ReturnsAsync((Guid id) => new UserEntity
+            {
+                Id = id,
+                Login = $"user-{id:N}",
+                PasswordHash = "hash",
+                Role = Roles.User
+            });
+
+        var service = new BookingService(_mapper, eventService.Object, bookingRepository.Object, userService.Object);
+        return (service, bookingRepository, eventService, userService);
+    }
+
+    private static EventDto CreateFutureEvent(Guid eventId, int totalSeats, int availableSeats)
+    {
+        return new EventDto
+        {
+            Id = eventId,
+            Title = "Test Event",
+            StartDate = DateTime.UtcNow.AddDays(1),
+            EndDate = DateTime.UtcNow.AddDays(1).AddHours(2),
+            TotalSeats = totalSeats,
+            AvailableSeats = availableSeats
+        };
     }
 }

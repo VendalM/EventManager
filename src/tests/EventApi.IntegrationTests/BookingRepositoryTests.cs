@@ -89,6 +89,24 @@ public class BookingRepositoryTests : IAsyncLifetime
         await context.SaveChangesAsync();
         return eventId;
     }
+
+    /// <summary>
+    /// Создает тестового пользователя для проверки внешнего ключа bookings.user_id.
+    /// </summary>
+    private async Task<Guid> CreateTestUserAsync()
+    {
+        await using var context = CreateContext();
+        var userId = Guid.NewGuid();
+        context.Users.Add(new UserEntity
+        {
+            Id = userId,
+            Login = $"user-{userId:N}",
+            PasswordHash = "hash",
+            Role = Roles.User
+        });
+        await context.SaveChangesAsync();
+        return userId;
+    }
     
     /// <summary>
     /// Проверяет, что AddAsync сохраняет бронирование в БД.
@@ -99,11 +117,13 @@ public class BookingRepositoryTests : IAsyncLifetime
         // Arrange
         await ResetDatabaseAsync();
         var eventId = await CreateTestEventAsync();
+        var userId = await CreateTestUserAsync();
         var bookingId = Guid.NewGuid();
         var booking = new BookingEntity
         {
             Id = bookingId,
             EventId = eventId,
+            UserId = userId,
             Status = BookingStatus.Pending,
             CreatedAt = NormalizeToUtc(DateTime.UtcNow)
         };
@@ -119,6 +139,7 @@ public class BookingRepositoryTests : IAsyncLifetime
         Assert.NotNull(saved);
         Assert.Equal(BookingStatus.Pending, saved.Status);
         Assert.Equal(eventId, saved.EventId);
+        Assert.Equal(userId, saved.UserId);
     }
 
     /// <summary>
@@ -130,12 +151,14 @@ public class BookingRepositoryTests : IAsyncLifetime
         // Arrange
         await ResetDatabaseAsync();
         var eventId = await CreateTestEventAsync();
+        var userId = await CreateTestUserAsync();
         var bookingId = Guid.NewGuid();
         await using var arrangeContext = CreateContext();
         arrangeContext.Bookings.Add(new BookingEntity
         {
             Id = bookingId,
             EventId = eventId,
+            UserId = userId,
             Status = BookingStatus.Confirmed,
             CreatedAt = NormalizeToUtc(DateTime.UtcNow)
         });
@@ -172,12 +195,14 @@ public class BookingRepositoryTests : IAsyncLifetime
         // Arrange
         await ResetDatabaseAsync();
         var eventId = await CreateTestEventAsync();
+        var userId = await CreateTestUserAsync();
         var bookingId = Guid.NewGuid();
         await using var arrangeContext = CreateContext();
         arrangeContext.Bookings.Add(new BookingEntity
         {
             Id = bookingId,
             EventId = eventId,
+            UserId = userId,
             Status = BookingStatus.Pending,
             CreatedAt = NormalizeToUtc(DateTime.UtcNow),
             ProcessedAt = null
@@ -190,6 +215,7 @@ public class BookingRepositoryTests : IAsyncLifetime
         {
             Id = bookingId,
             EventId = eventId,
+            UserId = userId,
             Status = BookingStatus.Rejected,
             CreatedAt = NormalizeToUtc(DateTime.UtcNow.AddMinutes(-10)),
             ProcessedAt = NormalizeToUtc(DateTime.UtcNow)
@@ -216,6 +242,7 @@ public class BookingRepositoryTests : IAsyncLifetime
         {
             Id = nonExistentId,
             EventId = Guid.NewGuid(),
+            UserId = Guid.NewGuid(),
             Status = BookingStatus.Pending,
             CreatedAt = NormalizeToUtc(DateTime.UtcNow)
         };
@@ -237,10 +264,11 @@ public class BookingRepositoryTests : IAsyncLifetime
         // Arrange
         await ResetDatabaseAsync();
         var eventId = await CreateTestEventAsync();
+        var userId = await CreateTestUserAsync();
         await using var arrangeContext = CreateContext();
         arrangeContext.Bookings.AddRange(
-            new BookingEntity { Id = Guid.NewGuid(), EventId = eventId, Status = BookingStatus.Pending, CreatedAt = NormalizeToUtc(DateTime.UtcNow) },
-            new BookingEntity { Id = Guid.NewGuid(), EventId = eventId, Status = BookingStatus.Confirmed, CreatedAt = NormalizeToUtc(DateTime.UtcNow) }
+            new BookingEntity { Id = Guid.NewGuid(), EventId = eventId, UserId = userId, Status = BookingStatus.Pending, CreatedAt = NormalizeToUtc(DateTime.UtcNow) },
+            new BookingEntity { Id = Guid.NewGuid(), EventId = eventId, UserId = userId, Status = BookingStatus.Confirmed, CreatedAt = NormalizeToUtc(DateTime.UtcNow) }
         );
         await arrangeContext.SaveChangesAsync();
 
@@ -260,9 +288,11 @@ public class BookingRepositoryTests : IAsyncLifetime
     {
         // Arrange
         await ResetDatabaseAsync();
+        var userId = await CreateTestUserAsync();
         var invalidBooking = new BookingEntity
         {
             Id = Guid.NewGuid(),
+            UserId = userId,
             EventId = Guid.NewGuid(), // несуществующий EventId
             Status = BookingStatus.Pending,
             CreatedAt = NormalizeToUtc(DateTime.UtcNow)
@@ -281,11 +311,13 @@ public class BookingRepositoryTests : IAsyncLifetime
     {
         await ResetDatabaseAsync();
         var eventId = await CreateTestEventAsync();
+        var userId = await CreateTestUserAsync();
         var bookingId = Guid.NewGuid();
         var booking = new BookingEntity
         {
             Id = bookingId,
             EventId = eventId,
+            UserId = userId,
             Status = BookingStatus.Confirmed,
             CreatedAt = NormalizeToUtc(DateTime.UtcNow)
         };
