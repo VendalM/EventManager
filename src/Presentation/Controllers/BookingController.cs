@@ -67,7 +67,7 @@ public class BookingController : ControllerBase
         var result = await _bookingService.CancelBookingAsync(id, userId);
         if (result != null)
         {
-            return Ok(result);
+            return NoContent();
         }
 
         throw new NotFoundException(id);

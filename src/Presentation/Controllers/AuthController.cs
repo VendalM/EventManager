@@ -29,8 +29,8 @@ public class AuthController : ControllerBase
     [HttpPost("register")]
     public async Task<ActionResult<UserDto>> Register([FromBody] UserRegistrationDto user)
     {
-        var result = await _userService.RegisterAsync(user);
-        return Ok(result);
+        await _userService.RegisterAsync(user);
+        return NoContent();
     }
 
     /// <summary>

@@ -66,7 +66,7 @@ public class UserService : IUserService
         var existingUser = await _userRepository.GetByLoginAsync(user.Login);
         if (existingUser == null || !_passwordHasher.Verify(user.Password, existingUser.PasswordHash))
         {
-            throw new ValidationException("Неверный логин или пароль.");
+            throw new NotFoundException(user.Login);
         }
 
         return await IssueTokensAsync(existingUser);
