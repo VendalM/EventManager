@@ -28,6 +28,16 @@ public class AppDbContext : DbContext
     public DbSet<BookingEntity> Bookings => Set<BookingEntity>();
     
     /// <summary>
+    /// Таблица пользователей
+    /// </summary>
+    public DbSet<UserEntity> Users => Set<UserEntity>();
+
+    /// <summary>
+    /// Таблица refresh-токенов.
+    /// </summary>
+    public DbSet<RefreshTokenEntity> RefreshTokens => Set<RefreshTokenEntity>();
+    
+    /// <summary>
     /// Объявление правил создания таблиц
     /// </summary>
     protected override void OnModelCreating(ModelBuilder modelBuilder)

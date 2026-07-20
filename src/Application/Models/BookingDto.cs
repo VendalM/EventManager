@@ -1,4 +1,4 @@
-using Domain.Enums;
+﻿using Domain.Enums;
 
 namespace Application.Models;
 
@@ -16,6 +16,11 @@ public class BookingDto
     /// Идентификатор события, к которому относится бронь
     /// </summary>
     public Guid EventId { get; set; }
+    
+    /// <summary>
+    /// Идентификатор пользователя, который создал бронь
+    /// </summary>
+    public Guid UserId { get; set; }
     
     /// <summary>
     /// Текущий статус брони
@@ -47,6 +52,20 @@ public class BookingDto
     public void Reject()
     {
         Status = BookingStatus.Rejected;
+        ProcessedAt = DateTime.UtcNow;
+    }
+
+    /// <summary>
+    /// Отмена брони, которое устанавливает статус в "Отменено" и сохраняет дату обработки
+    /// </summary>
+    public void Cancel()
+    {
+        if (Status == BookingStatus.Cancelled)
+        {
+            return;
+        }
+
+        Status = BookingStatus.Cancelled;
         ProcessedAt = DateTime.UtcNow;
     }
 }

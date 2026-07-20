@@ -2,6 +2,7 @@ using Application.Exceptions;
 using Application.Interfaces;
 using Application.Models;
 using EventManager.Application.Interfaces;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Presentation.Controllers;
@@ -58,6 +59,7 @@ public class EventController : ControllerBase
     /// <summary>
     /// Создает новое событие
     /// </summary>
+    [Authorize(Roles = "Admin")]
     [HttpPost]
     public async Task<ActionResult<EventDto>> Create([FromBody] EventSaveDto value)
     {
@@ -69,6 +71,7 @@ public class EventController : ControllerBase
     /// <summary>
     /// Редактирует существующее событие
     /// </summary>
+    [Authorize(Roles = "Admin")]
     [HttpPut("{id}")]
     public async Task<ActionResult<EventDto>> Update(Guid id,[FromBody] EventSaveDto updatedEvent)
     {
@@ -90,16 +93,19 @@ public class EventController : ControllerBase
     /// <summary>
     /// Создать бронь для события
     /// </summary>
+    [Authorize]
     [HttpPost("/events/{id}/book")]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<IActionResult> CreateBooking(Guid id)
     {
+        var userId = User.GetCurrentUserId();
+
         if (!await _eventService.HasEvent(id))
         {
             throw new NotFoundException(id);
         }
         
-        var result = await _bookingService.CreateBookingAsync(id);
+        var result = await _bookingService.CreateBookingAsync(id, userId);
         
         if (result == null)
         {
@@ -114,6 +120,7 @@ public class EventController : ControllerBase
     /// <summary>
     /// Удаление
     /// </summary>
+    [Authorize(Roles = "Admin")]
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> Delete(Guid id)
     {

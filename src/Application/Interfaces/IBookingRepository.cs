@@ -29,4 +29,15 @@ public interface IBookingRepository
     /// Получение всех бронирований
     /// </summary>
     Task<List<BookingEntity>> GetAllAsync();
+
+    /// <summary>
+    /// Проверить, не достигнут ли лимит создания броней
+    /// </summary>
+    /// <param name="userId">Идентификатор пользователя</param>
+    Task<bool> HasReachedActiveBookingsLimitAsync(Guid userId);
+
+    /// <summary>
+    /// Получить лимит.
+    /// </summary>
+    int GetActiveBookingsLimit();
 }
