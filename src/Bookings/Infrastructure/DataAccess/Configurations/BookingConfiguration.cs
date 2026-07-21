@@ -1,0 +1,47 @@
+using Bookings.Domain.Models;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata.Builders;
+
+namespace Bookings.Infrastructure.DataAccess.Configurations;
+
+/// <summary>
+/// Конфигурация сущности BookingEntity для Entity Framework Core
+/// </summary>
+public class BookingConfiguration: IEntityTypeConfiguration<BookingEntity>
+{
+    /// <summary>
+    /// Настройка модели BookingEntity для Entity Framework Core
+    /// </summary>
+    /// <param name="builder">Объект для настройки модели BookingEntity</param>
+    public void Configure(EntityTypeBuilder<BookingEntity> builder)
+    {
+        builder.ToTable("bookings");
+
+        builder.HasKey(b => b.Id);
+
+        builder.Property(b => b.Id)
+            .HasColumnName("id")
+            .ValueGeneratedNever();
+
+        builder.Property(b => b.EventId)
+            .HasColumnName("event_id")
+            .IsRequired();
+        
+        builder.Property(b => b.UserId)
+            .HasColumnName("user_id")
+            .IsRequired();
+
+        builder.Property(b => b.Status)
+            .HasColumnName("status")
+            .IsRequired()
+            .HasConversion<string>()
+            .HasMaxLength(20);
+
+        builder.Property(b => b.CreatedAt)
+            .HasColumnName("created_at")
+            .IsRequired();
+
+        builder.Property(b => b.ProcessedAt)
+            .HasColumnName("processed_at");
+    }
+}
