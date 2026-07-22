@@ -1,0 +1,1 @@
+namespace Bookings.Application.Services;

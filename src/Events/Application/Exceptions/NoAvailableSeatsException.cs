@@ -1,4 +1,4 @@
-namespace Bookings.Domain.Exceptions;
+namespace Events.Application.Exceptions;
 
 /// <summary>
 /// Класс для обработки ошибок, связанных с отсутствием доступных мест на событие

@@ -1,7 +1,7 @@
 namespace Contracts.Messages;
 
 /// <summary>
-/// Бронь направлена на подтвержление
+/// Бронь направлена на подтверждение
 /// </summary>
 public sealed record BookingRequested(
     Guid BookingId,

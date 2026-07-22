@@ -1,5 +1,6 @@
 using Contracts.Common;
 using Contracts.Events;
+using Contracts.Messages;
 using Events.Application.Models;
 
 namespace Events.Application.Interfaces;
@@ -62,4 +63,16 @@ public interface IEventService
     /// </summary>
     /// <param name="id">Идентификатор</param>
     public Task<bool> HasEvent(Guid id);
+
+    /// <summary>
+    /// Обработатка входящего бронирования
+    /// </summary>
+    /// <param name="body">Запрос за бронь</param>
+    public Task BookingRequested(BookingRequested body);
+    
+    /// <summary>
+    /// Обработка отмены бронирования
+    /// </summary>
+    /// <param name="body">Отмена брони</param>
+    public Task BookingCancelled(BookingCancelled body);
 }

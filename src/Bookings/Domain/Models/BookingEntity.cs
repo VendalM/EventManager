@@ -36,4 +36,36 @@ public class BookingEntity
     /// Дата и время обработки брони
     /// </summary>
     public DateTime? ProcessedAt { get; set; }
+    
+    /// <summary>
+    /// Подтверждение брони, которое устанавливает статус в "Подтверждено" и сохраняет дату обработки
+    /// </summary>
+    public void Confirm()
+    {
+        Status = BookingStatus.Confirmed;
+        ProcessedAt = DateTime.UtcNow;
+    }
+    
+    /// <summary>
+    /// Отклонение брони, которое устанавливает статус в "Отклонено" и сохраняет дату обработки
+    /// </summary>
+    public void Reject()
+    {
+        Status = BookingStatus.Rejected;
+        ProcessedAt = DateTime.UtcNow;
+    }
+
+    /// <summary>
+    /// Отмена брони, которое устанавливает статус в "Отменено" и сохраняет дату обработки
+    /// </summary>
+    public void Cancel()
+    {
+        if (Status == BookingStatus.Cancelled)
+        {
+            return;
+        }
+
+        Status = BookingStatus.Cancelled;
+        ProcessedAt = DateTime.UtcNow;
+    }
 }

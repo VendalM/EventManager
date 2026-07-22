@@ -1,4 +1,4 @@
-namespace Bookings.Domain.Exceptions;
+namespace Events.Domain.Exceptions;
 
 /// <summary>
 /// Исключение, возникающее при попытке установить общее количество мест меньше, чем уже занято.

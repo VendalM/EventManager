@@ -1,6 +1,10 @@
 using AutoMapper;
+using Events.Domain.Exceptions;
 using Contracts.Common;
+using Contracts.Enums;
 using Contracts.Events;
+using Contracts.Messages;
+using Events.Application.Exceptions;
 using Events.Application.Interfaces;
 using Events.Application.Models;
 using Events.Domain.Models;
@@ -14,16 +18,21 @@ public class EventService : IEventService
 {
     private readonly IMapper _mapper;
     private readonly IEventRepository _eventRepository;
+    private readonly IEventsEventPublisher _eventsEventPublisher;
 
     /// <summary>
     /// Конструктор сервиса событий
     /// </summary>
     /// <param name="mapper">AutoMapper для преобразования сущностей</param>
     /// <param name="eventRepository">Экземпляр репозитория событий</param>
-    public EventService(IMapper mapper, IEventRepository eventRepository)
+    /// <param name="eventsEventPublisher">Экземпляр контракта отправки сообщений</param>
+    public EventService(IMapper mapper, 
+        IEventRepository eventRepository, 
+        IEventsEventPublisher eventsEventPublisher)
     {
         _mapper = mapper;
         _eventRepository = eventRepository;
+        _eventsEventPublisher = eventsEventPublisher;
     }
     
     /// <inheritdoc />
@@ -98,7 +107,7 @@ public class EventService : IEventService
 
             if (newTotal < occupiedSeats)
             {
-               // throw new TotalSeatsTooLowException(existingEntity.Title, newTotal, occupiedSeats);
+                throw new TotalSeatsTooLowException(existingEntity.Title, newTotal, occupiedSeats);
             }
 
             existingEntity.AvailableSeats = newTotal - occupiedSeats;
@@ -133,5 +142,74 @@ public class EventService : IEventService
     public async Task<bool> HasEvent(Guid id)
     {
         return await _eventRepository.HasEventAsync(id);
+    }
+    
+    /// <inheritdoc />
+    public async Task BookingRequested(BookingRequested body)
+    {
+        var eventEntity = await _eventRepository.GetByIdAsync(body.EventId);
+        if (eventEntity == null)
+        {
+            await _eventsEventPublisher.PublishBookingRejectedAsync(
+                new BookingRejected(
+                    body.BookingId,
+                    body.EventId,
+                    body.UserId,
+                    body.SeatsCount,
+                    BookingRejectionReason.EventNotFound,
+                    DateTime.UtcNow));
+            return;
+        }
+
+        if (eventEntity.StartDate <= DateTime.UtcNow)
+        {
+            await _eventsEventPublisher.PublishBookingRejectedAsync(
+                new BookingRejected(
+                    body.BookingId,
+                    body.EventId,
+                    body.UserId,
+                    body.SeatsCount,
+                    BookingRejectionReason.EventAlreadyStarted,
+                    DateTime.UtcNow));
+            return;
+        }
+
+        var tryReserve = _mapper.Map<EventEntity>(eventEntity).TryReserveSeats();
+        if (!tryReserve)
+        {
+            await _eventsEventPublisher.PublishBookingRejectedAsync(
+                new BookingRejected(
+                    body.BookingId,
+                    body.EventId,
+                    body.UserId,
+                    body.SeatsCount,
+                    BookingRejectionReason.NoAvailableSeats,
+                    DateTime.UtcNow));
+            return;
+        }
+            
+        await UpdateInternal(body.EventId, _mapper.Map<EventDto>(eventEntity));
+
+        await _eventsEventPublisher.PublishBookingConfirmedAsync(
+            new BookingConfirmed(
+                body.BookingId,
+                body.EventId,
+                body.UserId,
+                body.SeatsCount,
+                DateTime.UtcNow));
+    }
+    
+    /// <inheritdoc />
+    public async Task BookingCancelled(BookingCancelled body)
+    {
+        var eventForBooking = await GetById(body.EventId);
+        if (eventForBooking == null)
+        {
+            throw new NotFoundException(body.EventId);
+        }
+        
+        _mapper.Map<EventEntity>(eventForBooking).ReleaseSeats();
+      
+        await UpdateInternal(body.EventId, eventForBooking);
     }
 }
