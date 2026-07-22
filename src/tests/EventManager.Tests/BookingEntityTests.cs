@@ -1,65 +1,84 @@
-
-
-using Domain.Enums;
-using Domain.Models;
+using Bookings.Domain.Models;
+using Contracts.Bookings;
 
 namespace EventManager.Tests;
 
 /// <summary>
-/// Набор тестов для сущности бронирования
+/// Unit-тесты доменной сущности брони: проверяют локальные переходы статусов без БД и Kafka.
 /// </summary>
 public class BookingEntityTests
 {
     /// <summary>
-    /// Проверка создания бронирования со статусом Pending
+    /// Проверяет доменный переход брони в Confirmed.
     /// </summary>
     [Fact]
-    public void CreatePending_SetsCorrectStatus()
+    public void Confirm_SetsConfirmedStatusAndProcessedAt()
     {
         var booking = new BookingEntity
         {
             Id = Guid.NewGuid(),
             Status = BookingStatus.Pending
         };
-        
-        Assert.Equal(BookingStatus.Pending, booking.Status);
-    }
-    
-    /// <summary>
-    /// Проверка смены статуса на Confirmed
-    /// </summary>
-    [Fact]
-    public void Confirm_ChangesStatusToConfirmed()
-    {
-        var booking = new BookingEntity
-        {
-            Id = Guid.NewGuid(),
-            Status = BookingStatus.Pending
-        };
-        
-        booking.Status = BookingStatus.Confirmed;
-        booking.ProcessedAt = DateTime.UtcNow;
-        
+
+        booking.Confirm();
+
         Assert.Equal(BookingStatus.Confirmed, booking.Status);
         Assert.NotNull(booking.ProcessedAt);
     }
-    
+
     /// <summary>
-    /// Проверка смены статуса на Rejected
+    /// Проверяет доменный переход брони в Rejected.
     /// </summary>
     [Fact]
-    public void Reject_ChangesStatusToRejected()
+    public void Reject_SetsRejectedStatusAndProcessedAt()
     {
         var booking = new BookingEntity
         {
             Id = Guid.NewGuid(),
             Status = BookingStatus.Pending
         };
-        
-        booking.Status = BookingStatus.Rejected;
-        booking.ProcessedAt = DateTime.UtcNow;
-        
+
+        booking.Reject();
+
         Assert.Equal(BookingStatus.Rejected, booking.Status);
         Assert.NotNull(booking.ProcessedAt);
+    }
+
+    /// <summary>
+    /// Проверяет доменный переход подтвержденной брони в Cancelled.
+    /// </summary>
+    [Fact]
+    public void Cancel_SetsCancelledStatusAndProcessedAt()
+    {
+        var booking = new BookingEntity
+        {
+            Id = Guid.NewGuid(),
+            Status = BookingStatus.Confirmed
+        };
+
+        booking.Cancel();
+
+        Assert.Equal(BookingStatus.Cancelled, booking.Status);
+        Assert.NotNull(booking.ProcessedAt);
+    }
+
+    /// <summary>
+    /// Проверяет, что повторная отмена не перезаписывает время обработки.
+    /// </summary>
+    [Fact]
+    public void Cancel_WhenAlreadyCancelled_DoesNotChangeProcessedAt()
+    {
+        var processedAt = DateTime.UtcNow.AddMinutes(-5);
+        var booking = new BookingEntity
+        {
+            Id = Guid.NewGuid(),
+            Status = BookingStatus.Cancelled,
+            ProcessedAt = processedAt
+        };
+
+        booking.Cancel();
+
+        Assert.Equal(BookingStatus.Cancelled, booking.Status);
+        Assert.Equal(processedAt, booking.ProcessedAt);
     }
 }

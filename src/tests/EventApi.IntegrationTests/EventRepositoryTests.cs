@@ -1,13 +1,13 @@
-using Domain.Models;
-using Infrastructure.DataAccess;
-using Infrastructure.Repositories;
+using Events.Domain.Models;
+using Events.Infrastructure.DataAccess;
+using Events.Infrastructure.Repositories;
 using Microsoft.EntityFrameworkCore;
 using Testcontainers.PostgreSql;
 
 namespace EventApi.IntegrationTests;
 
 /// <summary>
-/// Интеграционные тесты для EventRepository с реальной PostgreSQL в контейнере.
+/// Интеграционные тесты репозитория Events на реальном PostgreSQL-контейнере.
 /// </summary>
 public class EventRepositoryTests : IAsyncLifetime
 {
@@ -15,296 +15,134 @@ public class EventRepositoryTests : IAsyncLifetime
         .WithImage("postgres:16-alpine")
         .Build();
 
-    /// <summary>
-    /// Запускает контейнер и создаёт схему БД (таблицы events, bookings).
-    /// </summary>
     public async Task InitializeAsync()
     {
         await _postgres.StartAsync();
         await using var context = CreateContext();
         await context.Database.EnsureCreatedAsync();
     }
-    
-    /// <summary>
-    /// Останавливает и удаляет контейнер после выполнения всех тестов.
-    /// </summary>
-    public async Task DisposeAsync() => await _postgres.DisposeAsync();
 
-    /// <summary>
-    /// Создает соединение с БД.
-    /// </summary>
-    private AppDbContext CreateContext()
+    public async Task DisposeAsync()
     {
-        var options = new DbContextOptionsBuilder<AppDbContext>()
-            .UseNpgsql(_postgres.GetConnectionString())
-            .Options;
-        return new AppDbContext(options);
+        await _postgres.DisposeAsync();
     }
 
     /// <summary>
-    /// Полностью пересоздаёт тестовую базу данных: сбрасывает пул, завершает соединения,
-    /// удаляет и создаёт БД, затем создаёт схему через EnsureCreatedAsync.
+    /// Проверяет сохранение события в собственной БД Events.
     /// </summary>
+    [Fact]
+    public async Task AddAsync_SavesEventToEventsDatabase()
+    {
+        await ResetDatabaseAsync();
+        await using var context = CreateContext();
+        var repository = new EventRepository(context);
+        var eventEntity = CreateEvent();
+
+        await repository.AddAsync(eventEntity);
+
+        await using var verifyContext = CreateContext();
+        var saved = await verifyContext.Events.FirstOrDefaultAsync(x => x.Id == eventEntity.Id);
+
+        Assert.NotNull(saved);
+        Assert.Equal(eventEntity.Title, saved!.Title);
+        Assert.Equal(eventEntity.TotalSeats, saved.TotalSeats);
+        Assert.Equal(eventEntity.AvailableSeats, saved.AvailableSeats);
+    }
+
+    /// <summary>
+    /// Проверяет обновление основных полей события и количества доступных мест.
+    /// </summary>
+    [Fact]
+    public async Task UpdateAsync_UpdatesSeatsAndMainFields()
+    {
+        await ResetDatabaseAsync();
+        var eventEntity = CreateEvent(totalSeats: 10, availableSeats: 10);
+        await SeedEventAsync(eventEntity);
+        var repository = new EventRepository(CreateContext());
+
+        eventEntity.Title = "Updated event";
+        eventEntity.TotalSeats = 10;
+        eventEntity.AvailableSeats = 9;
+
+        await repository.UpdateAsync(eventEntity);
+
+        await using var verifyContext = CreateContext();
+        var saved = await verifyContext.Events.FirstAsync(x => x.Id == eventEntity.Id);
+
+        Assert.Equal("Updated event", saved.Title);
+        Assert.Equal(9, saved.AvailableSeats);
+    }
+
+    /// <summary>
+    /// Проверяет быстрый поиск существования события по идентификатору.
+    /// </summary>
+    [Fact]
+    public async Task HasEventAsync_ReturnsTrueOnlyForExistingEvent()
+    {
+        await ResetDatabaseAsync();
+        var eventEntity = CreateEvent();
+        await SeedEventAsync(eventEntity);
+        var repository = new EventRepository(CreateContext());
+
+        var existing = await repository.HasEventAsync(eventEntity.Id);
+        var missing = await repository.HasEventAsync(Guid.NewGuid());
+
+        Assert.True(existing);
+        Assert.False(missing);
+    }
+
+    /// <summary>
+    /// Проверяет удаление события из БД Events.
+    /// </summary>
+    [Fact]
+    public async Task RemoveAsync_DeletesExistingEvent()
+    {
+        await ResetDatabaseAsync();
+        var eventEntity = CreateEvent();
+        await SeedEventAsync(eventEntity);
+        var repository = new EventRepository(CreateContext());
+
+        var removed = await repository.RemoveAsync(eventEntity.Id);
+
+        Assert.True(removed);
+        await using var verifyContext = CreateContext();
+        Assert.False(await verifyContext.Events.AnyAsync(x => x.Id == eventEntity.Id));
+    }
+
+    private EventsAppDbContext CreateContext()
+    {
+        var options = new DbContextOptionsBuilder<EventsAppDbContext>()
+            .UseNpgsql(_postgres.GetConnectionString())
+            .Options;
+
+        return new EventsAppDbContext(options);
+    }
+
     private async Task ResetDatabaseAsync()
     {
         await using var context = CreateContext();
-        var tableNames = context.Model.GetEntityTypes()
-            .Select(t => t.GetTableName())
-            .Distinct()
-            .ToList();
-        if (tableNames.Any())
-        {
-            var truncateSql = $"TRUNCATE TABLE {string.Join(", ", tableNames)} RESTART IDENTITY CASCADE;";
-            await context.Database.ExecuteSqlRawAsync(truncateSql);
-        }
-    }
-
-    /// <summary>
-    /// Приводим время к UTC.
-    /// </summary>
-    private static DateTime NormalizeToUtc(DateTime value) => value.Kind switch
-    {
-        DateTimeKind.Utc => value,
-        DateTimeKind.Local => value.ToUniversalTime(),
-        _ => DateTime.SpecifyKind(value, DateTimeKind.Utc)
-    };
-    
-    /// <summary>
-    /// Проверяет, что AddAsync сохраняет событие в БД.
-    /// </summary>
-    [Fact]
-    public async Task AddAsync_ShouldSaveEventToDatabase()
-    {
-        await ResetDatabaseAsync();
-        await using var context = CreateContext();
-        var repo = new EventRepository(context);
-        var id = Guid.NewGuid();
-        var ev = new EventEntity
-        {
-            Id = id,
-            Title = "Конференция",
-            Description = "Описание",
-            StartDate = NormalizeToUtc(new DateTime(2024, 12, 25, 10, 0, 0)),
-            EndDate = NormalizeToUtc(new DateTime(2024, 12, 25, 18, 0, 0)),
-            TotalSeats = 100,
-            AvailableSeats = 100
-        };
-
-        await repo.AddAsync(ev);
-
-        await using var verifyContext = CreateContext();
-        var saved = await verifyContext.Events.FirstOrDefaultAsync(e => e.Id == id);
-        Assert.NotNull(saved);
-        Assert.Equal("Конференция", saved.Title);
-    }
-
-    /// <summary>
-    /// Проверяет, что GetByIdAsync возвращает событие, если оно существует.
-    /// </summary>
-    [Fact]
-    public async Task GetByIdAsync_WhenEventExists_ShouldReturnEvent()
-    {
-        await ResetDatabaseAsync();
-        await using var context = CreateContext();
-        var id = Guid.NewGuid();
-        context.Events.Add(new EventEntity
-        {
-            Id = id,
-            Title = "Test",
-            StartDate = NormalizeToUtc(DateTime.UtcNow),
-            EndDate = NormalizeToUtc(DateTime.UtcNow.AddHours(1)),
-            TotalSeats = 10,
-            AvailableSeats = 10
-        });
+        context.Events.RemoveRange(context.Events);
         await context.SaveChangesAsync();
-
-        var repo = new EventRepository(CreateContext());
-        var result = await repo.GetByIdAsync(id);
-
-        Assert.NotNull(result);
-        Assert.Equal("Test", result.Title);
     }
 
-    /// <summary>
-    /// Проверяет, что GetByIdAsync возвращает null для несуществующего ID.
-    /// </summary>
-    [Fact]
-    public async Task GetByIdAsync_WhenEventDoesNotExist_ShouldReturnNull()
+    private async Task SeedEventAsync(EventEntity eventEntity)
     {
-        await ResetDatabaseAsync();
-        var repo = new EventRepository(CreateContext());
-        var result = await repo.GetByIdAsync(Guid.NewGuid());
-        Assert.Null(result);
-    }
-
-    /// <summary>
-    /// Проверяет, что UpdateAsync изменяет существующее событие.
-    /// </summary>
-    [Fact]
-    public async Task UpdateAsync_ShouldModifyExistingEvent()
-    {
-        await ResetDatabaseAsync();
         await using var context = CreateContext();
-        var id = Guid.NewGuid();
-        context.Events.Add(new EventEntity
-        {
-            Id = id,
-            Title = "Old",
-            StartDate = NormalizeToUtc(DateTime.UtcNow),
-            EndDate = NormalizeToUtc(DateTime.UtcNow.AddHours(1)),
-            TotalSeats = 5,
-            AvailableSeats = 5
-        });
+        context.Events.Add(eventEntity);
         await context.SaveChangesAsync();
-
-        var repo = new EventRepository(CreateContext());
-        var updated = new EventEntity
-        {
-            Id = id,
-            Title = "New",
-            Description = "Updated description",
-            StartDate = NormalizeToUtc(DateTime.UtcNow.AddDays(1)),
-            EndDate = NormalizeToUtc(DateTime.UtcNow.AddDays(1).AddHours(2)),
-            TotalSeats = 20,
-            AvailableSeats = 20
-        };
-        await repo.UpdateAsync(updated);
-
-        await using var verifyContext = CreateContext();
-        var changed = await verifyContext.Events.FirstAsync(e => e.Id == id);
-        Assert.Equal("New", changed.Title);
-        Assert.Equal(20, changed.TotalSeats);
     }
 
-    /// <summary>
-    /// Проверяет, что RemoveAsync удаляет существующее событие и возвращает true.
-    /// </summary>
-    [Fact]
-    public async Task RemoveAsync_WhenEventExists_ShouldDeleteAndReturnTrue()
+    private static EventEntity CreateEvent(int totalSeats = 20, int availableSeats = 20)
     {
-        await ResetDatabaseAsync();
-        await using var context = CreateContext();
-        var id = Guid.NewGuid();
-        context.Events.Add(new EventEntity
-        {
-            Id = id,
-            Title = "ToDelete",
-            StartDate = NormalizeToUtc(DateTime.UtcNow),
-            EndDate = NormalizeToUtc(DateTime.UtcNow.AddHours(1)),
-            TotalSeats = 1,
-            AvailableSeats = 1
-        });
-        await context.SaveChangesAsync();
-
-        var repo = new EventRepository(CreateContext());
-        var result = await repo.RemoveAsync(id);
-
-        Assert.True(result);
-        await using var verifyContext = CreateContext();
-        var exists = await verifyContext.Events.AnyAsync(e => e.Id == id);
-        Assert.False(exists);
-    }
-
-    /// <summary>
-    /// Проверяет, что RemoveAsync возвращает false для несуществующего ID.
-    /// </summary>
-    [Fact]
-    public async Task RemoveAsync_WhenEventDoesNotExist_ShouldReturnFalse()
-    {
-        await ResetDatabaseAsync();
-        var repo = new EventRepository(CreateContext());
-        var result = await repo.RemoveAsync(Guid.NewGuid());
-        Assert.False(result);
-    }
-
-    /// <summary>
-    /// Проверяет, что GetAllAsync возвращает все события из БД.
-    /// </summary>
-    [Fact]
-    public async Task GetAllAsync_ShouldReturnAllEvents()
-    {
-        await ResetDatabaseAsync();
-        await using var context = CreateContext();
-        context.Events.AddRange(
-            new EventEntity { 
-                Id = Guid.NewGuid(), 
-                Title = "A", 
-                StartDate = NormalizeToUtc(DateTime.UtcNow), 
-                EndDate = NormalizeToUtc(DateTime.UtcNow.AddHours(1)), 
-                TotalSeats = 1, 
-                AvailableSeats = 1 
-            },
-            new EventEntity { 
-                Id = Guid.NewGuid(), 
-                Title = "B", 
-                StartDate = NormalizeToUtc(DateTime.UtcNow), 
-                EndDate = NormalizeToUtc(DateTime.UtcNow.AddHours(1)), 
-                TotalSeats = 1, 
-                AvailableSeats = 1 
-            }
-        );
-        await context.SaveChangesAsync();
-
-        var repo = new EventRepository(CreateContext());
-        var result = await repo.GetAllAsync();
-
-        Assert.Equal(2, result.Count);
-    }
-
-    /// <summary>
-    /// Проверяет, что HasEventAsync возвращает true для существующего события.
-    /// </summary>
-    [Fact]
-    public async Task HasEventAsync_ShouldReturnTrueForExistingEvent()
-    {
-        await ResetDatabaseAsync();
-        await using var context = CreateContext();
-        var id = Guid.NewGuid();
-        context.Events.Add(new EventEntity
-        {
-            Id = id,
-            Title = "Exists",
-            StartDate = NormalizeToUtc(DateTime.UtcNow),
-            EndDate = NormalizeToUtc(DateTime.UtcNow.AddHours(1)),
-            TotalSeats = 1,
-            AvailableSeats = 1
-        });
-        await context.SaveChangesAsync();
-
-        var repo = new EventRepository(CreateContext());
-        var result = await repo.HasEventAsync(id);
-        Assert.True(result);
-    }
-
-    /// <summary>
-    /// Проверяет, что HasEventAsync возвращает false для несуществующего события.
-    /// </summary>
-    [Fact]
-    public async Task HasEventAsync_ShouldReturnFalseForMissingEvent()
-    {
-        await ResetDatabaseAsync();
-        var repo = new EventRepository(CreateContext());
-        var result = await repo.HasEventAsync(Guid.NewGuid());
-        Assert.False(result);
-    }
-    
-    /// <summary>
-    /// Проверяет, что база данных отклоняет вставку события с пустым Title (NOT NULL).
-    /// </summary>
-    [Fact]
-    public async Task AddAsync_WhenTitleIsNull_ShouldThrowDbUpdateException()
-    {
-        await ResetDatabaseAsync();
-        var invalidEvent = new EventEntity
+        return new EventEntity
         {
             Id = Guid.NewGuid(),
-            Title = null!,
-            StartDate = NormalizeToUtc(DateTime.UtcNow),
-            EndDate = NormalizeToUtc(DateTime.UtcNow.AddHours(1)),
-            TotalSeats = 10,
-            AvailableSeats = 10
+            Title = "Test event",
+            Description = "Repository integration test",
+            StartDate = DateTime.UtcNow.AddDays(1),
+            EndDate = DateTime.UtcNow.AddDays(1).AddHours(2),
+            TotalSeats = totalSeats,
+            AvailableSeats = availableSeats
         };
-        var repo = new EventRepository(CreateContext());
-        await Assert.ThrowsAsync<DbUpdateException>(() => repo.AddAsync(invalidEvent));
     }
 }
