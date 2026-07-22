@@ -30,6 +30,8 @@ public sealed class KafkaBookingEventsConsumer : BackgroundService
     /// </summary>
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        await Task.Yield();
+
         var config = new ConsumerConfig
         {
             BootstrapServers = _options.BootstrapServers,
