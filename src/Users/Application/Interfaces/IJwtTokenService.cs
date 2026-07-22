@@ -2,6 +2,9 @@ using Users.Domain.Models;
 
 namespace Users.Application.Interfaces;
 
+/// <summary>
+/// Контракт сервиса генерации JWT и расчета срока жизни refresh-токена.
+/// </summary>
 public interface IJwtTokenService
 {
     /// <summary>

@@ -19,14 +19,17 @@ public interface IBookingService
     /// Получение брони по идентификатору
     /// </summary>
     /// <param name="bookingId">Идентификатор брони, которую нужно обработать</param>
-    Task<BookingDto?> GetBookingByIdAsync(Guid bookingId, Guid userId);
+    /// <param name="userId">Идентификатор пользователя</param>
+    /// <param name="isAdmin">Является ли пользователь админом</param>
+    Task<BookingDto?> GetBookingByIdAsync(Guid bookingId, Guid userId, bool isAdmin);
 
     /// <summary>
     /// Отмена брони для указанного события
     /// </summary>
     /// <param name="bookingId">Идентификатор события, для которого создается бронь</param>
-    /// <param name="userId">Идентификатор пользователя, создающего бронь.</param>
-    Task<BookingDto?> CancelBookingAsync(Guid bookingId, Guid userId);
+    /// <param name="userId">Идентификатор пользователя</param>
+    /// <param name="isAdmin">Является ли пользователь админом</param>
+    Task<BookingDto?> CancelBookingAsync(Guid bookingId, Guid userId, bool isAdmin);
 
     /// <summary>
     /// Бронь подтверждена

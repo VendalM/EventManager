@@ -9,4 +9,9 @@ public sealed class KafkaOptions
     /// Адреса Kafka-брокеров, через которые приложение подключается к кластеру.
     /// </summary>
     public string BootstrapServers { get; set; } = string.Empty;
+    
+    /// <summary>
+    /// Имя группы потребителей, внутри которой Kafka распределяет сообщения между экземплярами сервиса.
+    /// </summary>
+    public string ConsumerGroup { get; set; } = string.Empty;
 }

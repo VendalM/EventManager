@@ -33,6 +33,11 @@ public class EventSaveDto : IValidatableObject
     /// </summary>
     public int? TotalSeats { get; set; }
     
+    /// <summary>
+    /// Проверяет согласованность дат и количества мест при создании или обновлении события.
+    /// </summary>
+    /// <param name="validationContext">Контекст валидации модели.</param>
+    /// <returns>Список ошибок валидации.</returns>
     public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
     {
         if (StartDate == default)

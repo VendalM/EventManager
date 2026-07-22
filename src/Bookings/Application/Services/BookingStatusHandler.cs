@@ -3,9 +3,12 @@ using Contracts.Messages;
 
 namespace Bookings.Application.Services;
 
+/// <summary>
+/// Обработчик входящих сообщений, которые меняют статус брони после решения сервиса событий.
+/// </summary>
 public class BookingStatusHandler : IBookingStatusHandler
 {
-    public readonly IBookingService _bookingService;
+    private readonly IBookingService _bookingService;
     
     /// <summary>
     /// Конструктор слушателя сообщений
@@ -15,6 +18,7 @@ public class BookingStatusHandler : IBookingStatusHandler
     {
         _bookingService = bookingService;
     }
+
     /// <inheritdoc />
     public async Task HandleBookingConfirmedAsync(
         BookingConfirmed message,

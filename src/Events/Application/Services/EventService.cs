@@ -174,7 +174,7 @@ public class EventService : IEventService
             return;
         }
 
-        var tryReserve = _mapper.Map<EventEntity>(eventEntity).TryReserveSeats();
+        var tryReserve = eventEntity.TryReserveSeats(body.SeatsCount);
         if (!tryReserve)
         {
             await _eventsEventPublisher.PublishBookingRejectedAsync(
@@ -188,7 +188,7 @@ public class EventService : IEventService
             return;
         }
             
-        await UpdateInternal(body.EventId, _mapper.Map<EventDto>(eventEntity));
+        await _eventRepository.UpdateAsync(eventEntity);
 
         await _eventsEventPublisher.PublishBookingConfirmedAsync(
             new BookingConfirmed(
@@ -202,14 +202,14 @@ public class EventService : IEventService
     /// <inheritdoc />
     public async Task BookingCancelled(BookingCancelled body)
     {
-        var eventForBooking = await GetById(body.EventId);
-        if (eventForBooking == null)
+        var eventEntity = await _eventRepository.GetByIdAsync(body.EventId);
+        if (eventEntity == null)
         {
-            throw new NotFoundException(body.EventId);
+            return;
         }
         
-        _mapper.Map<EventEntity>(eventForBooking).ReleaseSeats();
+        eventEntity.ReleaseSeats(body.SeatsCount);
       
-        await UpdateInternal(body.EventId, eventForBooking);
+        await _eventRepository.UpdateAsync(eventEntity);
     }
 }

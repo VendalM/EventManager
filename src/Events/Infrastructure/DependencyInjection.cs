@@ -7,12 +7,20 @@ using Events.Infrastructure.Mappers;
 using Events.Infrastructure.Messaging;
 using Events.Infrastructure.Repositories;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace Events.Infrastructure;
 
+/// <summary>
+/// Методы регистрации инфраструктурных зависимостей сервиса событий.
+/// </summary>
 public static class DependencyInjection
 {
+    /// <summary>
+    /// Добавляет контекст БД, репозитории, маппинг и Kafka-компоненты сервиса событий.
+    /// </summary>
+    /// <param name="services">Коллекция сервисов приложения.</param>
+    /// <param name="configuration">Конфигурация приложения.</param>
+    /// <returns>Коллекция сервисов для дальнейшей настройки.</returns>
     public static IServiceCollection AddInfrastructure(
         this IServiceCollection services,
         IConfiguration configuration)
@@ -32,6 +40,7 @@ public static class DependencyInjection
         services.AddAutoMapper(typeof(EventMappingProfile).Assembly);
         
         // Обмен сообщениями
+        services.AddHostedService<KafkaTopicInitializer>();
         services.AddScoped<IBookingEventHandler, BookingEventHandler>();
         services.AddHostedService<KafkaBookingEventsConsumer>();
         services.Configure<KafkaOptions>(configuration.GetSection("Kafka"));

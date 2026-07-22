@@ -1,5 +1,8 @@
 namespace Users.Application.Models;
 
+/// <summary>
+/// Модель запроса с refresh-токеном.
+/// </summary>
 public class RefreshTokenDto
 {
     /// <summary>

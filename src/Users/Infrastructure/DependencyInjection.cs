@@ -7,8 +7,17 @@ using Users.Infrastructure.Services;
 
 namespace Users.Infrastructure;
 
+/// <summary>
+/// Методы регистрации инфраструктурных зависимостей сервиса пользователей.
+/// </summary>
 public static class DependencyInjection
 {
+    /// <summary>
+    /// Добавляет контекст БД, репозитории, генерацию токенов и маппинг сервиса пользователей.
+    /// </summary>
+    /// <param name="services">Коллекция сервисов приложения.</param>
+    /// <param name="configuration">Конфигурация приложения.</param>
+    /// <returns>Коллекция сервисов для дальнейшей настройки.</returns>
     public static IServiceCollection AddInfrastructure(
         this IServiceCollection services,
         IConfiguration configuration)

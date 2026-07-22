@@ -3,9 +3,12 @@ using Events.Application.Interfaces;
 
 namespace Events.Application.Services;
 
+/// <summary>
+/// Обработчик входящих сообщений о бронировании, которые должны изменить состояние события.
+/// </summary>
 public class BookingEventHandler : IBookingEventHandler
 {
-    public readonly IEventService _eventService;
+    private readonly IEventService _eventService;
     
     /// <summary>
     /// Конструктор слушателя сообщений
@@ -15,6 +18,7 @@ public class BookingEventHandler : IBookingEventHandler
     {
         _eventService = eventService;
     }
+    
     /// <inheritdoc />
     public async Task HandleBookingRequestedAsync(
         BookingRequested message,

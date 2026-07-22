@@ -33,7 +33,7 @@ public sealed class KafkaBookingEventsConsumer : BackgroundService
         var config = new ConsumerConfig
         {
             BootstrapServers = _options.BootstrapServers,
-            GroupId = "events-service",
+            GroupId = _options.ConsumerGroup,
             AutoOffsetReset = AutoOffsetReset.Earliest
         };
 
@@ -49,28 +49,47 @@ public sealed class KafkaBookingEventsConsumer : BackgroundService
         {
             while (!stoppingToken.IsCancellationRequested)
             {
-                var result = consumer.Consume(stoppingToken);
-
-                using var scope = _scopeFactory.CreateScope();
-                var handler = scope.ServiceProvider.GetRequiredService<IBookingEventHandler>();
-
-                switch (result.Topic)
+                try
                 {
-                    case BookingTopics.BookingRequested:
-                        var requested = JsonSerializer.Deserialize<BookingRequested>(result.Message.Value);
-                        if (requested != null)
-                            await handler.HandleBookingRequestedAsync(requested, stoppingToken);
-                        break;
+                    var result = consumer.Consume(stoppingToken);
 
-                    case BookingTopics.BookingCancelled:
-                        var cancelled = JsonSerializer.Deserialize<BookingCancelled>(result.Message.Value);
-                        if (cancelled != null)
-                            await handler.HandleBookingCancelledAsync(cancelled, stoppingToken);
-                        break;
+                    using var scope = _scopeFactory.CreateScope();
+                    var handler = scope.ServiceProvider.GetRequiredService<IBookingEventHandler>();
+
+                    switch (result.Topic)
+                    {
+                        case BookingTopics.BookingRequested:
+                            var requested = JsonSerializer.Deserialize<BookingRequested>(result.Message.Value);
+                            if (requested != null)
+                                await handler.HandleBookingRequestedAsync(requested, stoppingToken);
+                            break;
+
+                        case BookingTopics.BookingCancelled:
+                            var cancelled = JsonSerializer.Deserialize<BookingCancelled>(result.Message.Value);
+                            if (cancelled != null)
+                                await handler.HandleBookingCancelledAsync(cancelled, stoppingToken);
+                            break;
+                    }
+                }
+                catch (ConsumeException ex)
+                {
+                    _logger.LogError(ex, "Ошибка чтения сообщения из Kafka.");
+                }
+                catch (JsonException ex)
+                {
+                    _logger.LogError(ex, "Не удалось разобрать Kafka-сообщение.");
+                }
+                catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+                {
+                    break;
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Ошибка обработки Kafka-сообщения.");
                 }
             }
         }
-        catch (OperationCanceledException)
+        finally
         {
             consumer.Close();
         }

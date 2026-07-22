@@ -23,6 +23,22 @@ public class BookingController : ControllerBase
     }
     
     /// <summary>
+    /// Создать бронь
+    /// </summary>
+    [Authorize]
+    [HttpPost("/events/{eventId:guid}/book")]
+    public async Task<IActionResult> CreateBooking(Guid eventId)
+    {
+        var userId = User.GetCurrentUserId();
+
+        var result = await _bookingService.CreateBookingAsync(eventId, userId);
+
+        HttpContext.Response.Headers.Location = $"/bookings/{result!.Id}";
+
+        return StatusCode(202, result);
+    }
+    
+    /// <summary>
     /// Получить бронь по идентификатору
     /// </summary>
     [Authorize]
@@ -30,7 +46,8 @@ public class BookingController : ControllerBase
     public async Task<IActionResult> GetBooking(Guid id)
     {
         var userId = User.GetCurrentUserId();
-        var result = await _bookingService.GetBookingByIdAsync(id, userId);
+        var isAdmin = User.IsInRole("Admin");
+        var result = await _bookingService.GetBookingByIdAsync(id, userId, isAdmin);
         if (result != null)
         {
             return  Ok(result);
@@ -47,7 +64,8 @@ public class BookingController : ControllerBase
     public async Task<IActionResult> CancelBooking(Guid id)
     {
         var userId = User.GetCurrentUserId();
-        var result = await _bookingService.CancelBookingAsync(id, userId);
+        var isAdmin = User.IsInRole("Admin");
+        var result = await _bookingService.CancelBookingAsync(id, userId, isAdmin);
         if (result != null)
         {
             return  Ok(result);
@@ -64,7 +82,8 @@ public class BookingController : ControllerBase
     public async Task<IActionResult> DeleteBooking(Guid id)
     {
         var userId = User.GetCurrentUserId();
-        var result = await _bookingService.CancelBookingAsync(id, userId);
+        var isAdmin = User.IsInRole("Admin");
+        var result = await _bookingService.CancelBookingAsync(id, userId, isAdmin);
         if (result != null)
         {
             return NoContent();

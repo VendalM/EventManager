@@ -64,19 +64,24 @@ public class BookingService : IBookingService
     }
     
     /// <inheritdoc />
-    public async Task<BookingDto?> GetBookingByIdAsync(Guid bookingId, Guid userId)
+    public async Task<BookingDto?> GetBookingByIdAsync(Guid bookingId, Guid userId, bool isAdmin)
     {
         var entity = await _bookingRepository.GetByIdAsync(bookingId);
         if (entity == null)
         {
             return null;
         }
+        
+        if (!isAdmin && entity.UserId != userId)
+        {
+            throw new OperationForbiddenException();
+        }
 
         return _mapper.Map<BookingDto>(entity);
     }
 
     /// <inheritdoc />
-    public async Task<BookingDto?> CancelBookingAsync(Guid bookingId, Guid userId)
+    public async Task<BookingDto?> CancelBookingAsync(Guid bookingId, Guid userId, bool isAdmin)
     {
         var booking = await _bookingRepository.GetByIdAsync(bookingId);
         if (booking == null)
@@ -84,21 +89,32 @@ public class BookingService : IBookingService
             throw new NotFoundException(bookingId);
         }
         
-        if (booking.Status == BookingStatus.Rejected)
+        if (!isAdmin && booking.UserId != userId)
+        {
+            throw new OperationForbiddenException();
+        }
+        
+        if (booking.Status == BookingStatus.Rejected || booking.Status == BookingStatus.Cancelled)
         {
             return _mapper.Map<BookingDto>(booking);
+        }
+
+        if (booking.Status == BookingStatus.Pending)
+        {
+            throw new ValidationException("Бронь еще ожидает подтверждения и не может быть отменена.");
         }
         
         booking.Cancel();
         await _bookingRepository.UpdateAsync(booking);
         
+        var cancelledAt = booking.ProcessedAt!.Value;
         await _bookingEventPublisher.PublishBookingCancelledAsync(
             new BookingCancelled(
                 booking.Id,
                 booking.EventId,
                 booking.UserId,
                 1,
-                booking.ProcessedAt.Value));
+                cancelledAt));
 
         return _mapper.Map<BookingDto>(booking);
     }
@@ -107,7 +123,7 @@ public class BookingService : IBookingService
     public async Task BookingConfirmed(BookingConfirmed message)
     {
         var entity = await _bookingRepository.GetByIdAsync(message.BookingId);
-        if (entity == null)
+        if (entity == null || entity.Status != BookingStatus.Pending)
         {
             return;
         }
@@ -122,7 +138,7 @@ public class BookingService : IBookingService
     public async Task BookingRejected(BookingRejected message)
     {
         var entity = await _bookingRepository.GetByIdAsync(message.BookingId);
-        if (entity == null)
+        if (entity == null || entity.Status != BookingStatus.Pending)
         {
             return;
         }

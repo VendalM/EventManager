@@ -1,5 +1,8 @@
 namespace Users.Application.Models;
 
+/// <summary>
+/// Модель пары токенов, выдаваемой после входа или обновления сессии.
+/// </summary>
 public class AuthTokenDto
 {
     /// <summary>
