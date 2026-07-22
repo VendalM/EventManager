@@ -84,6 +84,11 @@ public class BookingService : IBookingService
             throw new NotFoundException(bookingId);
         }
         
+        if (booking.Status == BookingStatus.Rejected)
+        {
+            return _mapper.Map<BookingDto>(booking);
+        }
+        
         booking.Cancel();
         await _bookingRepository.UpdateAsync(booking);
         
@@ -96,5 +101,35 @@ public class BookingService : IBookingService
                 booking.ProcessedAt.Value));
 
         return _mapper.Map<BookingDto>(booking);
+    }
+
+    /// <inheritdoc />
+    public async Task BookingConfirmed(BookingConfirmed message)
+    {
+        var entity = await _bookingRepository.GetByIdAsync(message.BookingId);
+        if (entity == null)
+        {
+            return;
+        }
+
+        entity.ProcessedAt = message.ConfirmedAtUtc;
+        entity.Status = BookingStatus.Confirmed;
+
+        await _bookingRepository.UpdateAsync(entity);
+    }
+    
+    /// <inheritdoc />
+    public async Task BookingRejected(BookingRejected message)
+    {
+        var entity = await _bookingRepository.GetByIdAsync(message.BookingId);
+        if (entity == null)
+        {
+            return;
+        }
+
+        entity.ProcessedAt = message.RejectedAtUtc;
+        entity.Status = BookingStatus.Rejected;
+
+        await _bookingRepository.UpdateAsync(entity);
     }
 }

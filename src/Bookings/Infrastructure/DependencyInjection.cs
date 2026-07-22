@@ -1,4 +1,5 @@
 using Bookings.Application.Interfaces;
+using Bookings.Application.Services;
 using Bookings.Infrastructure.DataAccess;
 using Bookings.Infrastructure.Messaging;
 using Bookings.Infrastructure.Repositories;
@@ -24,6 +25,8 @@ public static class DependencyInjection
         services.AddScoped<IBookingRepository, BookingRepository>();
         
         // Обмен сообщениями
+        services.AddScoped<IBookingStatusHandler, BookingStatusHandler>();
+        services.AddHostedService<KafkaBookingEventsConsumer>();
         services.Configure<KafkaOptions>(configuration.GetSection("Kafka"));
         services.AddSingleton<IBookingEventPublisher, KafkaBookingEventPublisher>();
 

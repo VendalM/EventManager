@@ -31,6 +31,7 @@ public static class DependencyInjection
         // AutoMapper (профили, лежащие в Infrastructure)
         services.AddAutoMapper(typeof(EventMappingProfile).Assembly);
         
+        // Обмен сообщениями
         services.AddScoped<IBookingEventHandler, BookingEventHandler>();
         services.AddHostedService<KafkaBookingEventsConsumer>();
         services.Configure<KafkaOptions>(configuration.GetSection("Kafka"));

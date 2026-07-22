@@ -1,4 +1,5 @@
 using Contracts.Bookings;
+using Contracts.Messages;
 
 namespace Bookings.Application.Interfaces;
 
@@ -26,4 +27,16 @@ public interface IBookingService
     /// <param name="bookingId">Идентификатор события, для которого создается бронь</param>
     /// <param name="userId">Идентификатор пользователя, создающего бронь.</param>
     Task<BookingDto?> CancelBookingAsync(Guid bookingId, Guid userId);
+
+    /// <summary>
+    /// Бронь подтверждена
+    /// </summary>
+    /// <param name="message">Сообщение</param>
+    Task BookingConfirmed(BookingConfirmed message);
+    
+    /// <summary>
+    /// Бронь отказана
+    /// </summary>
+    /// <param name="message">Сообщение</param>
+    Task BookingRejected(BookingRejected message);
 }
