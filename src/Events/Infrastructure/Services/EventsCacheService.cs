@@ -16,6 +16,7 @@ public class EventsCacheService : IEventsCacheService
         _db = connection.GetDatabase();
     }
     
+    /// <inheritdoc />
     public async Task<EventEntity?> GetEventById(Guid id)
     {
         RedisValue value = await _db.StringGetAsync($"events:{id}");
@@ -28,6 +29,7 @@ public class EventsCacheService : IEventsCacheService
         return JsonSerializer.Deserialize<EventEntity>(value.ToString()); 
     }
 
+    /// <inheritdoc />
     public async Task SetEventById(EventEntity body)
     {
         if (body is null)
@@ -39,11 +41,13 @@ public class EventsCacheService : IEventsCacheService
         await _db.StringSetAsync($"events:{body.Id}", json, TimeSpan.FromMinutes(10));
     }
     
+    /// <inheritdoc />
     public Task RemoveEventAsync(Guid id)
     {
         return _db.KeyDeleteAsync($"events:{id}");
     }
 
+    /// <inheritdoc />
     public async Task<List<EventEntity>?> GetTopEventsAsync()
     {
         var value = await _db.StringGetAsync(TopEventsKey);
@@ -54,12 +58,14 @@ public class EventsCacheService : IEventsCacheService
         return JsonSerializer.Deserialize<List<EventEntity>>(value.ToString());
     }
 
+    /// <inheritdoc />
     public Task SetTopEventsAsync(List<EventEntity> events)
     {
         var json = JsonSerializer.Serialize(events);
         return _db.StringSetAsync(TopEventsKey, json, TopEventsTtl);
     }
 
+    /// <inheritdoc />
     public Task RemoveTopEventsAsync()
     {
         return _db.KeyDeleteAsync(TopEventsKey);
