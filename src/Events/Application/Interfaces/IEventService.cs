@@ -79,5 +79,6 @@ public interface IEventService
     /// <summary>
     /// Получить 10 популярных событий для бронирования
     /// </summary>
+    /// <returns>Список популярных событий.</returns>
     public Task<List<EventDto>?> GetTopEventsCachedAsync();
 }

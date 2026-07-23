@@ -6,6 +6,7 @@ using Events.Infrastructure.Messaging;
 using Events.Infrastructure.Repositories;
 using Events.Infrastructure.Services;
 using Microsoft.EntityFrameworkCore;
+using StackExchange.Redis;
 
 namespace Events.Infrastructure;
 
@@ -46,6 +47,11 @@ public static class DependencyInjection
         services.AddSingleton<IEventsEventPublisher, KafkaBookingEventPublisher>();
         
         // Кеш
+        var redisConnectionString = configuration["Redis:ConnectionString"]
+                                    ?? throw new InvalidOperationException("Redis connection string is not configured.");
+        var redisOptions = ConfigurationOptions.Parse(redisConnectionString);
+        redisOptions.AbortOnConnectFail = false;
+        services.AddSingleton<IConnectionMultiplexer>(_ => ConnectionMultiplexer.Connect(redisOptions));
         services.AddScoped<IEventsCacheService, EventsCacheService>();
         return services;
     }

@@ -21,6 +21,7 @@ public class EventService : IEventService
     private readonly IEventsEventPublisher _eventsEventPublisher;
     private readonly IConfiguration _configuration;
     private readonly IEventsCacheService _cacheService;
+    private readonly int _maxTopic;
 
     /// <summary>
     /// Конструктор сервиса событий
@@ -41,6 +42,8 @@ public class EventService : IEventService
         _eventsEventPublisher = eventsEventPublisher;
         _configuration = configuration;
         _cacheService = cacheService;
+
+        _maxTopic = _configuration.GetValue<int>("Options:MaxTopic", 10);
     }
     
     /// <inheritdoc />
@@ -84,17 +87,21 @@ public class EventService : IEventService
     {
         var entity = await _cacheService.GetEventById(id);
 
-        if (entity is null)
-        {
-            entity = await _eventRepository.GetByIdAsync(id); 
-        }
-        
         if (entity is not null)
         {
-            await _cacheService.SetEventById(entity);
+            return _mapper.Map<EventDto>(entity);
+        }
+
+        entity = await _eventRepository.GetByIdAsync(id);
+
+        if (entity is null)
+        {
+            return null;
         }
         
-        return entity == null ? null : _mapper.Map<EventDto>(entity);
+        await _cacheService.SetEventById(entity);
+
+        return _mapper.Map<EventDto>(entity);
     }
     
     /// <inheritdoc />
@@ -107,7 +114,6 @@ public class EventService : IEventService
         await _eventRepository.AddAsync(entity);
 
         await _cacheService.SetEventById(entity);
-        await _cacheService.RemoveTopEventsAsync();
         return _mapper.Map<EventDto>(entity);
     }
     
@@ -138,7 +144,6 @@ public class EventService : IEventService
             
         await _cacheService.RemoveEventAsync(id);
         await _cacheService.SetEventById(existingEntity);
-        await _cacheService.RemoveTopEventsAsync();
         return _mapper.Map<EventDto>(existingEntity);
     }
     
@@ -155,16 +160,20 @@ public class EventService : IEventService
         
         await _cacheService.RemoveEventAsync(id);
         await _cacheService.SetEventById(existingEntity);
-        await _cacheService.RemoveTopEventsAsync();
         return _mapper.Map<EventDto>(existingEntity);
     }
     
     /// <inheritdoc />
     public async Task<bool> Delete(Guid id)
     {
-        await _cacheService.RemoveEventAsync(id);
-        await _cacheService.RemoveTopEventsAsync();
-        return await _eventRepository.RemoveAsync(id);
+        var removed = await _eventRepository.RemoveAsync(id);
+
+        if (removed)
+        {
+            await _cacheService.RemoveEventAsync(id);
+        }
+
+        return removed;
     }
     
     /// <inheritdoc />
@@ -229,7 +238,6 @@ public class EventService : IEventService
         
         await _cacheService.RemoveEventAsync(body.EventId);
         await _cacheService.SetEventById(eventEntity);
-        await _cacheService.RemoveTopEventsAsync();
     }
     
     /// <inheritdoc />
@@ -246,7 +254,6 @@ public class EventService : IEventService
         await _eventRepository.UpdateAsync(eventEntity);
         await _cacheService.RemoveEventAsync(body.EventId);
         await _cacheService.SetEventById(eventEntity);
-        await _cacheService.RemoveTopEventsAsync();
     }
 
     /// <inheritdoc />
@@ -259,9 +266,7 @@ public class EventService : IEventService
             return _mapper.Map<List<EventDto>>(entity);
         }
         
-        var maxTopic = _configuration.GetValue<int>("Options:maxTopic", 10);
-
-        var topEvents = await _eventRepository.GetTopEventsAsync(maxTopic);
+        var topEvents = await _eventRepository.GetTopEventsAsync(_maxTopic);
         
         if (topEvents is not null)
         {

@@ -108,6 +108,7 @@ public class EventController : ControllerBase
     /// <summary>
     /// Получение топ 10 событий
     /// </summary>
+    /// <returns>Список популярных событий.</returns>
     [Authorize]
     [HttpGet("top")]
     public async Task<ActionResult<List<EventDto>?>> Top()
