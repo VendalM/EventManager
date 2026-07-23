@@ -9,6 +9,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using StackExchange.Redis;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -57,6 +58,20 @@ builder.Services.Configure<ApiBehaviorOptions>(options =>
 {
     options.SuppressModelStateInvalidFilter = true;
 });
+
+var options = new ConfigurationOptions
+{
+    EndPoints = { "localhost:6379" },
+    Password = "EventManagerPassword",
+    ConnectTimeout = 5000,
+    SyncTimeout = 3000,
+    AbortOnConnectFail = false,
+};
+
+builder.Services.AddSingleton<IConnectionMultiplexer>(
+    ConnectionMultiplexer.Connect(options)
+);
+
 
 var app = builder.Build();
 

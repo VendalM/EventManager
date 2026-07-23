@@ -1,11 +1,10 @@
-using AutoMapper;
-using AutoMapper.Configuration;
 using Events.Application.Interfaces;
 using Events.Application.Services;
 using Events.Infrastructure.DataAccess;
 using Events.Infrastructure.Mappers;
 using Events.Infrastructure.Messaging;
 using Events.Infrastructure.Repositories;
+using Events.Infrastructure.Services;
 using Microsoft.EntityFrameworkCore;
 
 namespace Events.Infrastructure;
@@ -45,7 +44,9 @@ public static class DependencyInjection
         services.AddHostedService<KafkaBookingEventsConsumer>();
         services.Configure<KafkaOptions>(configuration.GetSection("Kafka"));
         services.AddSingleton<IEventsEventPublisher, KafkaBookingEventPublisher>();
-
+        
+        // Кеш
+        services.AddScoped<IEventsCacheService, EventsCacheService>();
         return services;
     }
 }

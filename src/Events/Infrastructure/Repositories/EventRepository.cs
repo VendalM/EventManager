@@ -75,4 +75,16 @@ public class EventRepository : IEventRepository
     {
         return _context.Events.AnyAsync(e => e.Id == id);
     }
+
+    /// <inheritdoc />
+    public async Task<List<EventEntity>?> GetTopEventsAsync(int count)
+    {
+        var topEvents = await _context.Events
+            .Where(e => e.TotalSeats != 0)
+            .OrderByDescending(e => (double)(e.TotalSeats - e.AvailableSeats) / e.TotalSeats)
+            .Take(count)
+            .ToListAsync();
+
+        return topEvents;
+    }
 }

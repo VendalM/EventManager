@@ -12,6 +12,11 @@ services:
       timeout: 5s
       retries: 10
 
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
+
   kafka:
     image: confluentinc/cp-kafka:7.6.1
     container_name: eventapi-kafka

@@ -39,4 +39,6 @@ public interface IEventRepository
     /// Проверить, существует ли событие с данным идентификатором
     /// </summary>
     Task<bool> HasEventAsync(Guid id);
+
+    Task<List<EventEntity>?> GetTopEventsAsync(int count);
 }

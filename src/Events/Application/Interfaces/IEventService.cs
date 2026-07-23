@@ -75,4 +75,9 @@ public interface IEventService
     /// </summary>
     /// <param name="body">Отмена брони</param>
     public Task BookingCancelled(BookingCancelled body);
+
+    /// <summary>
+    /// Получить 10 популярных событий для бронирования
+    /// </summary>
+    public Task<List<EventDto>?> GetTopEventsCachedAsync();
 }
