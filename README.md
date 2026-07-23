@@ -15,6 +15,7 @@ EventManager сейчас разделен на три независимых We
 
 - `users-db`, `events-db`, `bookings-db` - отдельные PostgreSQL базы под каждый сервис;
 - `kafka` - брокер сообщений, доступен с хоста по `localhost:9092`;
+- `redis` - кеш для сервиса `Events`, доступен с хоста по `localhost:6379`;
 - `zookeeper` - служебный контейнер для Kafka.
 
 У сервисов нет навигационных свойств между чужими доменными сущностями. Связи между сервисами хранятся только как идентификаторы: `UserId`, `EventId`, `BookingId`.
@@ -70,21 +71,25 @@ TTL вынесены в `Events/appsettings.json`:
 Самый простой способ запустить всю систему локально:
 
 ```powershell
-.\scripts\start-dev.ps1
+cd C:\Users\mariya.zhmakina\Work\EventManager\docker
+docker compose up --build
 ```
 
-Скрипт:
+Команда собирает Docker-образы API-сервисов и поднимает всю систему:
 
-- поднимает Docker-инфраструктуру;
-- собирает три API проекта;
-- запускает `Users`, `Events` и `Bookings` в фоне;
-- пишет логи в `.run/logs`;
-- показывает ссылки на Swagger.
+- `Users`;
+- `Events`;
+- `Bookings`;
+- `users-db`, `events-db`, `bookings-db`;
+- `Kafka`, `Zookeeper`, `Redis`.
 
-Если PowerShell блокирует запуск `.ps1`, используйте командный файл:
+По умолчанию используется development-сборка из общего `docker/Dockerfile`. Для production-сборки без скриптов можно переключить Docker target и окружение:
 
 ```powershell
-.\scripts\start-dev.cmd
+$env:DOCKER_BUILD_TARGET="production"
+$env:ASPNETCORE_ENVIRONMENT="Production"
+$env:DOTNET_ENVIRONMENT="Production"
+docker compose up --build
 ```
 
 Swagger:
@@ -93,16 +98,10 @@ Swagger:
 - Events: `http://localhost:5203/swagger`
 - Bookings: `http://localhost:5075/swagger`
 
-Остановить только API сервисы:
+Остановить контейнеры:
 
 ```powershell
-.\scripts\stop-dev.ps1
-```
-
-Остановить API сервисы и Docker-инфраструктуру:
-
-```powershell
-.\scripts\stop-dev.ps1 -WithDocker
+docker compose down
 ```
 
 ## Авторизация в Swagger
@@ -114,11 +113,11 @@ Swagger:
 
 ## Ручной запуск без скрипта
 
-Если нужно запустить по шагам:
+Если нужно отлаживать API из IDE или через `dotnet run`, поднимите через Docker только инфраструктуру:
 
 ```powershell
 cd C:\Users\mariya.zhmakina\Work\EventManager\docker
-docker compose up -d
+docker compose up -d users-db events-db bookings-db redis kafka
 ```
 
 В отдельных терминалах:
