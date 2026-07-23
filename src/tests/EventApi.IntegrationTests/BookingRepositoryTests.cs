@@ -1,14 +1,14 @@
-using Domain.Enums;
-using Domain.Models;
-using Infrastructure.DataAccess;
-using Infrastructure.Repositories;
+using Bookings.Domain.Models;
+using Bookings.Infrastructure.DataAccess;
+using Bookings.Infrastructure.Repositories;
+using Contracts.Bookings;
 using Microsoft.EntityFrameworkCore;
 using Testcontainers.PostgreSql;
 
 namespace EventApi.IntegrationTests;
 
 /// <summary>
-/// Интеграционные тесты для BookingRepository с реальной PostgreSQL в контейнере.
+/// Интеграционные тесты репозитория Bookings на реальном PostgreSQL-контейнере.
 /// </summary>
 public class BookingRepositoryTests : IAsyncLifetime
 {
@@ -16,9 +16,6 @@ public class BookingRepositoryTests : IAsyncLifetime
         .WithImage("postgres:16-alpine")
         .Build();
 
-    /// <summary>
-    /// Запускает контейнер и создаёт схему БД (таблицы events, bookings).
-    /// </summary>
     public async Task InitializeAsync()
     {
         await _postgres.StartAsync();
@@ -26,308 +23,149 @@ public class BookingRepositoryTests : IAsyncLifetime
         await context.Database.EnsureCreatedAsync();
     }
 
-    /// <summary>
-    /// Останавливает и удаляет контейнер после выполнения всех тестов.
-    /// </summary>
-    public async Task DisposeAsync() => await _postgres.DisposeAsync();
-
-    /// <summary>
-    /// Создает соединение с БД.
-    /// </summary>
-    private AppDbContext CreateContext()
+    public async Task DisposeAsync()
     {
-        var options = new DbContextOptionsBuilder<AppDbContext>()
-            .UseNpgsql(_postgres.GetConnectionString())
-            .Options;
-        return new AppDbContext(options);
+        await _postgres.DisposeAsync();
     }
 
     /// <summary>
-    /// Очищает все данные из таблиц (events, bookings), не удаляя схему.
-    /// Используется перед каждым тестом для изоляции.
+    /// Проверяет, что бронь сохраняется в собственной БД Bookings без таблиц Users и Events.
     /// </summary>
+    [Fact]
+    public async Task AddAsync_SavesBookingWithoutUsersOrEventsTables()
+    {
+        await ResetDatabaseAsync();
+        await using var context = CreateContext();
+        var repository = new BookingRepository(context);
+        var booking = CreateBooking(BookingStatus.Pending);
+
+        await repository.AddAsync(booking);
+
+        await using var verifyContext = CreateContext();
+        var saved = await verifyContext.Bookings.FirstOrDefaultAsync(x => x.Id == booking.Id);
+
+        Assert.NotNull(saved);
+        Assert.Equal(booking.EventId, saved!.EventId);
+        Assert.Equal(booking.UserId, saved.UserId);
+        Assert.Equal(BookingStatus.Pending, saved.Status);
+    }
+
+    /// <summary>
+    /// Проверяет сохранение финального статуса и времени обработки брони.
+    /// </summary>
+    [Fact]
+    public async Task UpdateAsync_ChangesStatusAndProcessedAt()
+    {
+        await ResetDatabaseAsync();
+        var booking = CreateBooking(BookingStatus.Pending);
+        await SeedBookingAsync(booking);
+        var processedAt = DateTime.UtcNow;
+        var repository = new BookingRepository(CreateContext());
+
+        booking.Status = BookingStatus.Confirmed;
+        booking.ProcessedAt = processedAt;
+
+        await repository.UpdateAsync(booking);
+
+        await using var verifyContext = CreateContext();
+        var saved = await verifyContext.Bookings.FirstAsync(x => x.Id == booking.Id);
+
+        Assert.Equal(BookingStatus.Confirmed, saved.Status);
+        Assert.NotNull(saved.ProcessedAt);
+        Assert.True(
+            (saved.ProcessedAt.Value - processedAt).Duration() < TimeSpan.FromMilliseconds(1),
+            "PostgreSQL stores timestamp values with microsecond precision.");
+    }
+
+    /// <summary>
+    /// Проверяет, что лимит активных броней учитывает только Pending и Confirmed.
+    /// </summary>
+    [Fact]
+    public async Task HasReachedActiveBookingsLimitAsync_CountsOnlyPendingAndConfirmed()
+    {
+        await ResetDatabaseAsync();
+        var userId = Guid.NewGuid();
+        var repository = new BookingRepository(CreateContext());
+
+        await SeedBookingAsync(CreateBooking(BookingStatus.Pending, userId));
+        await SeedBookingAsync(CreateBooking(BookingStatus.Confirmed, userId));
+        await SeedBookingAsync(CreateBooking(BookingStatus.Rejected, userId));
+        await SeedBookingAsync(CreateBooking(BookingStatus.Cancelled, userId));
+
+        var limitReached = await repository.HasReachedActiveBookingsLimitAsync(userId);
+
+        Assert.False(limitReached);
+    }
+
+    /// <summary>
+    /// Проверяет, что репозиторий считает лимит достигнутым при максимальном количестве активных броней.
+    /// </summary>
+    [Fact]
+    public async Task HasReachedActiveBookingsLimitAsync_ReturnsTrueAtLimit()
+    {
+        await ResetDatabaseAsync();
+        var userId = Guid.NewGuid();
+        var repository = new BookingRepository(CreateContext());
+
+        for (var i = 0; i < repository.GetActiveBookingsLimit(); i++)
+        {
+            await SeedBookingAsync(CreateBooking(BookingStatus.Pending, userId));
+        }
+
+        var limitReached = await repository.HasReachedActiveBookingsLimitAsync(userId);
+
+        Assert.True(limitReached);
+    }
+
+    /// <summary>
+    /// Проверяет чтение всех броней из отдельной БД Bookings.
+    /// </summary>
+    [Fact]
+    public async Task GetAllAsync_ReturnsAllBookingsFromBookingsDatabase()
+    {
+        await ResetDatabaseAsync();
+        await SeedBookingAsync(CreateBooking(BookingStatus.Pending));
+        await SeedBookingAsync(CreateBooking(BookingStatus.Confirmed));
+        var repository = new BookingRepository(CreateContext());
+
+        var result = await repository.GetAllAsync();
+
+        Assert.Equal(2, result.Count);
+    }
+
+    private BookingsAppDbContext CreateContext()
+    {
+        var options = new DbContextOptionsBuilder<BookingsAppDbContext>()
+            .UseNpgsql(_postgres.GetConnectionString())
+            .Options;
+
+        return new BookingsAppDbContext(options);
+    }
+
     private async Task ResetDatabaseAsync()
     {
         await using var context = CreateContext();
-        var tableNames = context.Model.GetEntityTypes()
-            .Select(t => t.GetTableName())
-            .Distinct()
-            .ToList();
-        if (tableNames.Any())
-        {
-            var truncateSql = $"TRUNCATE TABLE {string.Join(", ", tableNames)} RESTART IDENTITY CASCADE;";
-            await context.Database.ExecuteSqlRawAsync(truncateSql);
-        }
-    }
-
-    /// <summary>
-    /// Приводим время к UTC.
-    /// </summary>
-    private static DateTime NormalizeToUtc(DateTime value) => value.Kind switch
-    {
-        DateTimeKind.Utc => value,
-        DateTimeKind.Local => value.ToUniversalTime(),
-        _ => DateTime.SpecifyKind(value, DateTimeKind.Utc)
-    };
-    
-    /// <summary>
-    /// Создаем тестовое событие для привязывания брони.
-    /// </summary>
-    private async Task<Guid> CreateTestEventAsync()
-    {
-        await using var context = CreateContext();
-        var eventId = Guid.NewGuid();
-        context.Events.Add(new EventEntity
-        {
-            Id = eventId,
-            Title = "Test Event",
-            StartDate = NormalizeToUtc(DateTime.UtcNow.AddDays(1)),
-            EndDate = NormalizeToUtc(DateTime.UtcNow.AddDays(1).AddHours(2)),
-            TotalSeats = 10,
-            AvailableSeats = 10
-        });
+        context.Bookings.RemoveRange(context.Bookings);
         await context.SaveChangesAsync();
-        return eventId;
     }
 
-    /// <summary>
-    /// Создает тестового пользователя для проверки внешнего ключа bookings.user_id.
-    /// </summary>
-    private async Task<Guid> CreateTestUserAsync()
+    private async Task SeedBookingAsync(BookingEntity booking)
     {
         await using var context = CreateContext();
-        var userId = Guid.NewGuid();
-        context.Users.Add(new UserEntity
-        {
-            Id = userId,
-            Login = $"user-{userId:N}",
-            PasswordHash = "hash",
-            Role = Roles.User
-        });
+        context.Bookings.Add(booking);
         await context.SaveChangesAsync();
-        return userId;
-    }
-    
-    /// <summary>
-    /// Проверяет, что AddAsync сохраняет бронирование в БД.
-    /// </summary>
-    [Fact]
-    public async Task AddAsync_ShouldSaveBookingToDatabase()
-    {
-        // Arrange
-        await ResetDatabaseAsync();
-        var eventId = await CreateTestEventAsync();
-        var userId = await CreateTestUserAsync();
-        var bookingId = Guid.NewGuid();
-        var booking = new BookingEntity
-        {
-            Id = bookingId,
-            EventId = eventId,
-            UserId = userId,
-            Status = BookingStatus.Pending,
-            CreatedAt = NormalizeToUtc(DateTime.UtcNow)
-        };
-
-        // Act
-        await using var context = CreateContext();
-        var repo = new BookingRepository(context);
-        await repo.AddAsync(booking);
-
-        // Assert
-        await using var verifyContext = CreateContext();
-        var saved = await verifyContext.Bookings.FirstOrDefaultAsync(b => b.Id == bookingId);
-        Assert.NotNull(saved);
-        Assert.Equal(BookingStatus.Pending, saved.Status);
-        Assert.Equal(eventId, saved.EventId);
-        Assert.Equal(userId, saved.UserId);
     }
 
-    /// <summary>
-    /// Проверяет, что GetByIdAsync возвращает бронирование, если оно существует.
-    /// </summary>
-    [Fact]
-    public async Task GetByIdAsync_WhenBookingExists_ShouldReturnBooking()
+    private static BookingEntity CreateBooking(BookingStatus status, Guid? userId = null)
     {
-        // Arrange
-        await ResetDatabaseAsync();
-        var eventId = await CreateTestEventAsync();
-        var userId = await CreateTestUserAsync();
-        var bookingId = Guid.NewGuid();
-        await using var arrangeContext = CreateContext();
-        arrangeContext.Bookings.Add(new BookingEntity
-        {
-            Id = bookingId,
-            EventId = eventId,
-            UserId = userId,
-            Status = BookingStatus.Confirmed,
-            CreatedAt = NormalizeToUtc(DateTime.UtcNow)
-        });
-        await arrangeContext.SaveChangesAsync();
-
-        // Act
-        var repo = new BookingRepository(CreateContext());
-        var result = await repo.GetByIdAsync(bookingId);
-
-        // Assert
-        Assert.NotNull(result);
-        Assert.Equal(bookingId, result.Id);
-        Assert.Equal(BookingStatus.Confirmed, result.Status);
-    }
-
-    /// <summary>
-    /// Проверяет, что GetByIdAsync возвращает null для несуществующего ID.
-    /// </summary>
-    [Fact]
-    public async Task GetByIdAsync_WhenBookingDoesNotExist_ShouldReturnNull()
-    {
-        await ResetDatabaseAsync();
-        var repo = new BookingRepository(CreateContext());
-        var result = await repo.GetByIdAsync(Guid.NewGuid());
-        Assert.Null(result);
-    }
-
-    /// <summary>
-    /// Проверяет, что UpdateAsync изменяет существующее бронирование.
-    /// </summary>
-    [Fact]
-    public async Task UpdateAsync_ShouldModifyExistingBooking()
-    {
-        // Arrange
-        await ResetDatabaseAsync();
-        var eventId = await CreateTestEventAsync();
-        var userId = await CreateTestUserAsync();
-        var bookingId = Guid.NewGuid();
-        await using var arrangeContext = CreateContext();
-        arrangeContext.Bookings.Add(new BookingEntity
-        {
-            Id = bookingId,
-            EventId = eventId,
-            UserId = userId,
-            Status = BookingStatus.Pending,
-            CreatedAt = NormalizeToUtc(DateTime.UtcNow),
-            ProcessedAt = null
-        });
-        await arrangeContext.SaveChangesAsync();
-
-        // Act
-        var repo = new BookingRepository(CreateContext());
-        var updatedBooking = new BookingEntity
-        {
-            Id = bookingId,
-            EventId = eventId,
-            UserId = userId,
-            Status = BookingStatus.Rejected,
-            CreatedAt = NormalizeToUtc(DateTime.UtcNow.AddMinutes(-10)),
-            ProcessedAt = NormalizeToUtc(DateTime.UtcNow)
-        };
-        await repo.UpdateAsync(updatedBooking);
-
-        // Assert
-        await using var verifyContext = CreateContext();
-        var changed = await verifyContext.Bookings.FirstAsync(b => b.Id == bookingId);
-        Assert.Equal(BookingStatus.Rejected, changed.Status);
-        Assert.NotNull(changed.ProcessedAt);
-    }
-
-    /// <summary>
-    /// Проверяет, что UpdateAsync не падает и не меняет ничего при несуществующем бронировании.
-    /// </summary>
-    [Fact]
-    public async Task UpdateAsync_WhenBookingDoesNotExist_ShouldNotThrowAndNotChangeDatabase()
-    {
-        // Arrange
-        await ResetDatabaseAsync();
-        var nonExistentId = Guid.NewGuid();
-        var fakeBooking = new BookingEntity
-        {
-            Id = nonExistentId,
-            EventId = Guid.NewGuid(),
-            UserId = Guid.NewGuid(),
-            Status = BookingStatus.Pending,
-            CreatedAt = NormalizeToUtc(DateTime.UtcNow)
-        };
-
-        // Act & Assert
-        var repo = new BookingRepository(CreateContext());
-        await repo.UpdateAsync(fakeBooking);
-        await using var verifyContext = CreateContext();
-        var exists = await verifyContext.Bookings.AnyAsync(b => b.Id == nonExistentId);
-        Assert.False(exists);
-    }
-
-    /// <summary>
-    /// Проверяет, что GetAllAsync возвращает все бронирования из БД.
-    /// </summary>
-    [Fact]
-    public async Task GetAllAsync_ShouldReturnAllBookings()
-    {
-        // Arrange
-        await ResetDatabaseAsync();
-        var eventId = await CreateTestEventAsync();
-        var userId = await CreateTestUserAsync();
-        await using var arrangeContext = CreateContext();
-        arrangeContext.Bookings.AddRange(
-            new BookingEntity { Id = Guid.NewGuid(), EventId = eventId, UserId = userId, Status = BookingStatus.Pending, CreatedAt = NormalizeToUtc(DateTime.UtcNow) },
-            new BookingEntity { Id = Guid.NewGuid(), EventId = eventId, UserId = userId, Status = BookingStatus.Confirmed, CreatedAt = NormalizeToUtc(DateTime.UtcNow) }
-        );
-        await arrangeContext.SaveChangesAsync();
-
-        // Act
-        var repo = new BookingRepository(CreateContext());
-        var result = await repo.GetAllAsync();
-
-        // Assert
-        Assert.Equal(2, result.Count);
-    }
-    
-    /// <summary>
-    /// Проверяет, что база данных отклоняет вставку бронирования с несуществующим EventId (нарушение внешнего ключа).
-    /// </summary>
-    [Fact]
-    public async Task AddAsync_WhenEventIdDoesNotExist_ShouldThrowDbUpdateException()
-    {
-        // Arrange
-        await ResetDatabaseAsync();
-        var userId = await CreateTestUserAsync();
-        var invalidBooking = new BookingEntity
+        return new BookingEntity
         {
             Id = Guid.NewGuid(),
-            UserId = userId,
-            EventId = Guid.NewGuid(), // несуществующий EventId
-            Status = BookingStatus.Pending,
-            CreatedAt = NormalizeToUtc(DateTime.UtcNow)
+            EventId = Guid.NewGuid(),
+            UserId = userId ?? Guid.NewGuid(),
+            Status = status,
+            CreatedAt = DateTime.UtcNow.AddMinutes(-10),
+            ProcessedAt = status == BookingStatus.Pending ? null : DateTime.UtcNow.AddMinutes(-5)
         };
-
-        // Act & Assert
-        var repo = new BookingRepository(CreateContext());
-        await Assert.ThrowsAsync<DbUpdateException>(() => repo.AddAsync(invalidBooking));
-    }
-
-    /// <summary>
-    /// Проверяет, что Status преобразуется в строку через Enum-конвертер (не вызовет исключения).
-    /// </summary>
-    [Fact]
-    public async Task AddAsync_ShouldStoreAndRetrieveStatusAsEnum()
-    {
-        await ResetDatabaseAsync();
-        var eventId = await CreateTestEventAsync();
-        var userId = await CreateTestUserAsync();
-        var bookingId = Guid.NewGuid();
-        var booking = new BookingEntity
-        {
-            Id = bookingId,
-            EventId = eventId,
-            UserId = userId,
-            Status = BookingStatus.Confirmed,
-            CreatedAt = NormalizeToUtc(DateTime.UtcNow)
-        };
-
-        await using var context = CreateContext();
-        var repo = new BookingRepository(context);
-        await repo.AddAsync(booking);
-
-        await using var verifyContext = CreateContext();
-        var retrieved = await verifyContext.Bookings.FirstAsync(b => b.Id == bookingId);
-        Assert.Equal(BookingStatus.Confirmed, retrieved.Status);
     }
 }

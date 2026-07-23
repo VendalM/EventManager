@@ -1,0 +1,24 @@
+using Contracts.Auth;
+
+namespace Users.Application.Models;
+
+/// <summary>
+/// Модель пользователя, возвращаемая наружу без пароля и технических данных.
+/// </summary>
+public class UserDto
+{
+    /// <summary>
+    /// Уникальный идентификатор пользователя.
+    /// </summary>
+    public Guid Id { get; set; }
+    
+    /// <summary>
+    /// Логин.
+    /// </summary>
+    public string Login { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Роль.
+    /// </summary>
+    public Roles Role { get; set; }
+}
