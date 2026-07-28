@@ -1,0 +1,13 @@
+.git/
+.idea/
+.run/
+scripts/
+**/bin/
+**/obj/
+**/TestResults/
+**/.vs/
+**/.vscode/
+**/.idea/
+*.user
+*.suo
+src/global.json

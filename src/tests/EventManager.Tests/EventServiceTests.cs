@@ -6,6 +6,7 @@ using Events.Application.Models;
 using Events.Application.Services;
 using Events.Domain.Models;
 using Events.Infrastructure.Mappers;
+using Microsoft.Extensions.Configuration;
 using Moq;
 
 namespace EventManager.Tests;
@@ -30,7 +31,7 @@ public class EventServiceTests
     public async Task Create_SetsAvailableSeatsEqualToTotalSeats()
     {
         EventEntity? savedEvent = null;
-        var (service, repository, _) = CreateService();
+        var (service, repository, _, _) = CreateService();
         repository.Setup(x => x.AddAsync(It.IsAny<EventEntity>()))
             .Callback<EventEntity>(entity => savedEvent = entity)
             .Returns(Task.CompletedTask);
@@ -60,7 +61,7 @@ public class EventServiceTests
         var request = CreateBookingRequested(eventEntity.Id);
         EventEntity? updatedEvent = null;
         BookingConfirmed? confirmedMessage = null;
-        var (service, repository, publisher) = CreateService();
+        var (service, repository, publisher, cache) = CreateService();
 
         repository.Setup(x => x.GetByIdAsync(eventEntity.Id)).ReturnsAsync(eventEntity);
         repository.Setup(x => x.UpdateAsync(It.IsAny<EventEntity>()))
@@ -80,6 +81,8 @@ public class EventServiceTests
         Assert.Equal(request.EventId, confirmedMessage.EventId);
         Assert.Equal(request.UserId, confirmedMessage.UserId);
         Assert.Equal(request.SeatsCount, confirmedMessage.SeatsCount);
+        cache.Verify(x => x.RemoveEventAsync(eventEntity.Id), Times.Once);
+        cache.Verify(x => x.SetEventById(It.Is<EventEntity>(e => e.Id == eventEntity.Id)), Times.Once);
         publisher.Verify(x => x.PublishBookingRejectedAsync(It.IsAny<BookingRejected>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
@@ -91,7 +94,7 @@ public class EventServiceTests
     {
         var request = CreateBookingRequested(Guid.NewGuid());
         BookingRejected? rejectedMessage = null;
-        var (service, repository, publisher) = CreateService();
+        var (service, repository, publisher, _) = CreateService();
 
         repository.Setup(x => x.GetByIdAsync(request.EventId)).ReturnsAsync((EventEntity?)null);
         publisher.Setup(x => x.PublishBookingRejectedAsync(It.IsAny<BookingRejected>(), It.IsAny<CancellationToken>()))
@@ -123,7 +126,7 @@ public class EventServiceTests
         };
         var request = CreateBookingRequested(eventEntity.Id);
         BookingRejected? rejectedMessage = null;
-        var (service, repository, publisher) = CreateService();
+        var (service, repository, publisher, _) = CreateService();
 
         repository.Setup(x => x.GetByIdAsync(eventEntity.Id)).ReturnsAsync(eventEntity);
         publisher.Setup(x => x.PublishBookingRejectedAsync(It.IsAny<BookingRejected>(), It.IsAny<CancellationToken>()))
@@ -147,7 +150,7 @@ public class EventServiceTests
         var eventEntity = CreateFutureEvent(availableSeats: 0);
         var request = CreateBookingRequested(eventEntity.Id);
         BookingRejected? rejectedMessage = null;
-        var (service, repository, publisher) = CreateService();
+        var (service, repository, publisher, _) = CreateService();
 
         repository.Setup(x => x.GetByIdAsync(eventEntity.Id)).ReturnsAsync(eventEntity);
         publisher.Setup(x => x.PublishBookingRejectedAsync(It.IsAny<BookingRejected>(), It.IsAny<CancellationToken>()))
@@ -172,7 +175,7 @@ public class EventServiceTests
         var eventEntity = CreateFutureEvent(totalSeats: 3, availableSeats: 1);
         var message = new BookingCancelled(Guid.NewGuid(), eventEntity.Id, Guid.NewGuid(), 1, DateTime.UtcNow);
         EventEntity? updatedEvent = null;
-        var (service, repository, _) = CreateService();
+        var (service, repository, _, cache) = CreateService();
 
         repository.Setup(x => x.GetByIdAsync(eventEntity.Id)).ReturnsAsync(eventEntity);
         repository.Setup(x => x.UpdateAsync(It.IsAny<EventEntity>()))
@@ -183,6 +186,8 @@ public class EventServiceTests
 
         Assert.NotNull(updatedEvent);
         Assert.Equal(2, updatedEvent!.AvailableSeats);
+        cache.Verify(x => x.RemoveEventAsync(eventEntity.Id), Times.Once);
+        cache.Verify(x => x.SetEventById(It.Is<EventEntity>(e => e.Id == eventEntity.Id)), Times.Once);
     }
 
     /// <summary>
@@ -194,7 +199,7 @@ public class EventServiceTests
         var eventEntity = CreateFutureEvent(totalSeats: 3, availableSeats: 3);
         var message = new BookingCancelled(Guid.NewGuid(), eventEntity.Id, Guid.NewGuid(), 1, DateTime.UtcNow);
         EventEntity? updatedEvent = null;
-        var (service, repository, _) = CreateService();
+        var (service, repository, _, _) = CreateService();
 
         repository.Setup(x => x.GetByIdAsync(eventEntity.Id)).ReturnsAsync(eventEntity);
         repository.Setup(x => x.UpdateAsync(It.IsAny<EventEntity>()))
@@ -207,19 +212,173 @@ public class EventServiceTests
         Assert.Equal(3, updatedEvent!.AvailableSeats);
     }
 
-    private (EventService service, Mock<IEventRepository> repository, Mock<IEventsEventPublisher> publisher) CreateService()
+    /// <summary>
+    /// Проверяет, что при попадании события в кеш репозиторий не вызывается.
+    /// </summary>
+    [Fact]
+    public async Task GetById_WhenCacheHit_ReturnsCachedEventWithoutRepositoryCall()
+    {
+        var cachedEvent = CreateFutureEvent();
+        var (service, repository, _, cache) = CreateService();
+
+        cache.Setup(x => x.GetEventById(cachedEvent.Id)).ReturnsAsync(cachedEvent);
+
+        var result = await service.GetById(cachedEvent.Id);
+
+        Assert.NotNull(result);
+        Assert.Equal(cachedEvent.Id, result!.Id);
+        repository.Verify(x => x.GetByIdAsync(It.IsAny<Guid>()), Times.Never);
+        cache.Verify(x => x.SetEventById(It.IsAny<EventEntity>()), Times.Never);
+    }
+
+    /// <summary>
+    /// Проверяет, что при промахе кеша событие берется из репозитория и сохраняется в кеш.
+    /// </summary>
+    [Fact]
+    public async Task GetById_WhenCacheMiss_LoadsFromRepositoryAndCachesEvent()
+    {
+        var eventEntity = CreateFutureEvent();
+        var (service, repository, _, cache) = CreateService();
+
+        repository.Setup(x => x.GetByIdAsync(eventEntity.Id)).ReturnsAsync(eventEntity);
+
+        var result = await service.GetById(eventEntity.Id);
+
+        Assert.NotNull(result);
+        Assert.Equal(eventEntity.Id, result!.Id);
+        repository.Verify(x => x.GetByIdAsync(eventEntity.Id), Times.Once);
+        cache.Verify(x => x.SetEventById(It.Is<EventEntity>(e => e.Id == eventEntity.Id)), Times.Once);
+    }
+
+    /// <summary>
+    /// Проверяет, что при попадании топа событий в кеш репозиторий не вызывается.
+    /// </summary>
+    [Fact]
+    public async Task GetTopEventsCachedAsync_WhenCacheHit_ReturnsCachedEventsWithoutRepositoryCall()
+    {
+        var cachedEvents = new List<EventEntity>
+        {
+            CreateFutureEvent(totalSeats: 10, availableSeats: 1)
+        };
+        var (service, repository, _, cache) = CreateService();
+
+        cache.Setup(x => x.GetTopEventsAsync()).ReturnsAsync(cachedEvents);
+
+        var result = await service.GetTopEventsCachedAsync();
+
+        Assert.NotNull(result);
+        Assert.Single(result!);
+        Assert.Equal(cachedEvents[0].Id, result![0].Id);
+        repository.Verify(x => x.GetTopEventsAsync(It.IsAny<int>()), Times.Never);
+        cache.Verify(x => x.SetTopEventsAsync(It.IsAny<List<EventEntity>>()), Times.Never);
+    }
+
+    /// <summary>
+    /// Проверяет, что при промахе кеша топ событий берется из репозитория и сохраняется в кеш.
+    /// </summary>
+    [Fact]
+    public async Task GetTopEventsCachedAsync_WhenCacheMiss_LoadsFromRepositoryAndCachesEvents()
+    {
+        var topEvents = new List<EventEntity>
+        {
+            CreateFutureEvent(totalSeats: 10, availableSeats: 1),
+            CreateFutureEvent(totalSeats: 20, availableSeats: 5)
+        };
+        var (service, repository, _, cache) = CreateService();
+
+        repository.Setup(x => x.GetTopEventsAsync(10)).ReturnsAsync(topEvents);
+
+        var result = await service.GetTopEventsCachedAsync();
+
+        Assert.NotNull(result);
+        Assert.Equal(2, result!.Count);
+        repository.Verify(x => x.GetTopEventsAsync(10), Times.Once);
+        cache.Verify(x => x.SetTopEventsAsync(topEvents), Times.Once);
+    }
+
+    /// <summary>
+    /// Проверяет, что при обновлении события кеш одиночного события обновляется, а кеш топа остается жить по TTL.
+    /// </summary>
+    [Fact]
+    public async Task Update_WhenEventExists_UpdatesEventCacheAndDoesNotInvalidateTopCache()
+    {
+        var eventEntity = CreateFutureEvent(totalSeats: 10, availableSeats: 7);
+        var (service, repository, _, cache) = CreateService();
+
+        repository.Setup(x => x.GetByIdAsync(eventEntity.Id)).ReturnsAsync(eventEntity);
+
+        var result = await service.Update(eventEntity.Id, new EventSaveDto
+        {
+            Title = "Updated event",
+            Description = "Updated description",
+            StartDate = eventEntity.StartDate,
+            EndDate = eventEntity.EndDate,
+            TotalSeats = 12
+        });
+
+        Assert.NotNull(result);
+        cache.Verify(x => x.RemoveEventAsync(eventEntity.Id), Times.Once);
+        cache.Verify(x => x.SetEventById(It.Is<EventEntity>(e => e.Id == eventEntity.Id)), Times.Once);
+        cache.Verify(x => x.RemoveTopEventsAsync(), Times.Never);
+    }
+
+    /// <summary>
+    /// Проверяет, что при удалении существующего события кеш одиночного события инвалидируется после удаления из репозитория.
+    /// </summary>
+    [Fact]
+    public async Task Delete_WhenEventRemoved_InvalidatesEventCacheAndDoesNotInvalidateTopCache()
+    {
+        var eventId = Guid.NewGuid();
+        var (service, repository, _, cache) = CreateService();
+
+        repository.Setup(x => x.RemoveAsync(eventId)).ReturnsAsync(true);
+
+        var result = await service.Delete(eventId);
+
+        Assert.True(result);
+        repository.Verify(x => x.RemoveAsync(eventId), Times.Once);
+        cache.Verify(x => x.RemoveEventAsync(eventId), Times.Once);
+        cache.Verify(x => x.RemoveTopEventsAsync(), Times.Never);
+    }
+
+    private (EventService service,
+        Mock<IEventRepository> repository,
+        Mock<IEventsEventPublisher> publisher,
+        Mock<IEventsCacheService> cache) CreateService()
     {
         var repository = new Mock<IEventRepository>();
         var publisher = new Mock<IEventsEventPublisher>();
+        var cache = new Mock<IEventsCacheService>();
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Options:MaxTopic"] = "10"
+            })
+            .Build();
 
         repository.Setup(x => x.AddAsync(It.IsAny<EventEntity>())).Returns(Task.CompletedTask);
         repository.Setup(x => x.UpdateAsync(It.IsAny<EventEntity>())).Returns(Task.CompletedTask);
+        repository.Setup(x => x.GetTopEventsAsync(It.IsAny<int>())).ReturnsAsync(new List<EventEntity>());
         publisher.Setup(x => x.PublishBookingConfirmedAsync(It.IsAny<BookingConfirmed>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
         publisher.Setup(x => x.PublishBookingRejectedAsync(It.IsAny<BookingRejected>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
+        cache.Setup(x => x.GetEventById(It.IsAny<Guid>())).ReturnsAsync((EventEntity?)null);
+        cache.Setup(x => x.SetEventById(It.IsAny<EventEntity>())).Returns(Task.CompletedTask);
+        cache.Setup(x => x.RemoveEventAsync(It.IsAny<Guid>())).Returns(Task.CompletedTask);
+        cache.Setup(x => x.GetTopEventsAsync()).ReturnsAsync((List<EventEntity>?)null);
+        cache.Setup(x => x.SetTopEventsAsync(It.IsAny<List<EventEntity>>())).Returns(Task.CompletedTask);
+        cache.Setup(x => x.RemoveTopEventsAsync()).Returns(Task.CompletedTask);
 
-        return (new EventService(_mapper, repository.Object, publisher.Object), repository, publisher);
+        return (new EventService(
+                _mapper,
+                repository.Object,
+                publisher.Object,
+                configuration,
+                cache.Object),
+            repository,
+            publisher,
+            cache);
     }
 
     private static EventEntity CreateFutureEvent(int totalSeats = 2, int availableSeats = 2)

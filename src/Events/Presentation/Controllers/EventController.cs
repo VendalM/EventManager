@@ -104,4 +104,15 @@ public class EventController : ControllerBase
 
         throw new NotFoundException(id);
     }
+    
+    /// <summary>
+    /// Получение топ 10 событий
+    /// </summary>
+    /// <returns>Список популярных событий.</returns>
+    [Authorize]
+    [HttpGet("top")]
+    public async Task<ActionResult<List<EventDto>?>> Top()
+    {
+        return await _eventService.GetTopEventsCachedAsync();
+    }
 }

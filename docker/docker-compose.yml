@@ -12,6 +12,17 @@ services:
       timeout: 5s
       retries: 10
 
+  redis:
+    image: redis:7.2-alpine
+    container_name: eventapi-redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
   kafka:
     image: confluentinc/cp-kafka:7.6.1
     container_name: eventapi-kafka
@@ -19,7 +30,7 @@ services:
       zookeeper:
         condition: service_healthy
     ports:
-      # Внешний listener для подключения с хоста (например, из dotnet run локально).
+      # Внешний listener для подключения с хоста.
       - "9092:9092"
     environment:
       KAFKA_BROKER_ID: 1
@@ -36,6 +47,75 @@ services:
       interval: 10s
       timeout: 10s
       retries: 15
+
+  users-api:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      target: ${DOCKER_BUILD_TARGET:-development}
+      args:
+        PROJECT: Users/Users.csproj
+        APP_DLL: Users.dll
+    container_name: eventapi-users
+    depends_on:
+      users-db:
+        condition: service_healthy
+    ports:
+      - "5202:8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Development}
+      DOTNET_ENVIRONMENT: ${DOTNET_ENVIRONMENT:-Development}
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__Default: Host=users-db;Port=5432;Database=users;Username=postgres;Password=postgres
+
+  events-api:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      target: ${DOCKER_BUILD_TARGET:-development}
+      args:
+        PROJECT: Events/Events.csproj
+        APP_DLL: Events.dll
+    container_name: eventapi-events
+    depends_on:
+      events-db:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "5203:8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Development}
+      DOTNET_ENVIRONMENT: ${DOTNET_ENVIRONMENT:-Development}
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__Default: Host=events-db;Port=5432;Database=events;Username=postgres;Password=postgres
+      Kafka__BootstrapServers: kafka:29092
+      Redis__ConnectionString: redis:6379,abortConnect=false
+
+  bookings-api:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      target: ${DOCKER_BUILD_TARGET:-development}
+      args:
+        PROJECT: Bookings/Bookings.csproj
+        APP_DLL: Bookings.dll
+    container_name: eventapi-bookings
+    depends_on:
+      bookings-db:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    ports:
+      - "5075:8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Development}
+      DOTNET_ENVIRONMENT: ${DOTNET_ENVIRONMENT:-Development}
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__Default: Host=bookings-db;Port=5432;Database=bookings;Username=postgres;Password=postgres
+      Kafka__BootstrapServers: kafka:29092
 
   # ─────────────────────────── Базы данных (по одной на сервис) ───────────────────────────
   users-db:

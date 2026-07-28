@@ -1,0 +1,1 @@
+# Put trusted root CA certificates (*.crt) here if Docker build cannot validate HTTPS feeds.

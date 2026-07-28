@@ -15,6 +15,7 @@ EventManager сейчас разделен на три независимых We
 
 - `users-db`, `events-db`, `bookings-db` - отдельные PostgreSQL базы под каждый сервис;
 - `kafka` - брокер сообщений, доступен с хоста по `localhost:9092`;
+- `redis` - кеш для сервиса `Events`, доступен с хоста по `localhost:6379`;
 - `zookeeper` - служебный контейнер для Kafka.
 
 У сервисов нет навигационных свойств между чужими доменными сущностями. Связи между сервисами хранятся только как идентификаторы: `UserId`, `EventId`, `BookingId`.
@@ -47,26 +48,48 @@ EventManager сейчас разделен на три независимых We
 
 Важно: `Bookings` не уменьшает места у события и не обращается к `Events` напрямую. `Events` не хранит брони и пользователей целиком, а работает только с идентификаторами из сообщения.
 
+## Стратегия кеширования Events
+
+Сервис `Events` использует Redis через пакет `StackExchange.Redis`. Подключение зарегистрировано в DI как singleton `IConnectionMultiplexer`, потому что Redis-клиент потокобезопасный и рассчитан на переиспользование в течение жизни приложения. Строка подключения хранится в `Events/appsettings.json` в параметре `Redis:ConnectionString`; для локального запуска используется `localhost:6379,abortConnect=false`, а при контейнерном запуске значение можно переопределить переменной окружения `Redis__ConnectionString`.
+
+Кеширование изолировано за интерфейсом `IEventsCacheService` в Application-слое, реализация `EventsCacheService` находится в Infrastructure. Если Redis недоступен, операции кеша логируют предупреждение и не пробрасывают ошибку клиенту: чтение считается промахом кеша, запись или удаление просто пропускается, а основная бизнес-операция продолжает работать через базу данных.
+
+Кешируются два сценария:
+
+- `GET /events/{id}` — cache-aside по ключу `event:{id}`. Сначала читается Redis; при промахе событие загружается из БД и сохраняется в кеш.
+- `GET /events/top` — топ популярных событий по ключу `events:top10`. Популярность считается как `(TotalSeats - AvailableSeats) / TotalSeats`, сортировка идет по убыванию процента проданных мест.
+
+TTL вынесены в `Events/appsettings.json`:
+
+- `Cache:EventsTtlMinutes` — время жизни кеша отдельного события;
+- `Cache:TopEventsTtlMinutes` — время жизни кеша топа событий.
+
+Для отдельного события выбрана стратегия обновления при записи: после изменения события или обработки Kafka-сообщения кеш `event:{id}` обновляется после успешного сохранения в БД, а при удалении события ключ удаляется после успешного удаления из БД. Для топа используется TTL без ручной инвалидации при каждой брони: это рейтинговый агрегат, небольшое устаревание допустимо, а частая инвалидация при изменении мест дала бы лишнюю нагрузку.
+
 ## Запуск
 
 Самый простой способ запустить всю систему локально:
 
 ```powershell
-.\scripts\start-dev.ps1
+cd C:\Users\mariya.zhmakina\Work\EventManager\docker
+docker compose up --build
 ```
 
-Скрипт:
+Команда собирает Docker-образы API-сервисов и поднимает всю систему:
 
-- поднимает Docker-инфраструктуру;
-- собирает три API проекта;
-- запускает `Users`, `Events` и `Bookings` в фоне;
-- пишет логи в `.run/logs`;
-- показывает ссылки на Swagger.
+- `Users`;
+- `Events`;
+- `Bookings`;
+- `users-db`, `events-db`, `bookings-db`;
+- `Kafka`, `Zookeeper`, `Redis`.
 
-Если PowerShell блокирует запуск `.ps1`, используйте командный файл:
+По умолчанию используется development-сборка из общего `docker/Dockerfile`. Для production-сборки без скриптов можно переключить Docker target и окружение:
 
 ```powershell
-.\scripts\start-dev.cmd
+$env:DOCKER_BUILD_TARGET="production"
+$env:ASPNETCORE_ENVIRONMENT="Production"
+$env:DOTNET_ENVIRONMENT="Production"
+docker compose up --build
 ```
 
 Swagger:
@@ -75,16 +98,10 @@ Swagger:
 - Events: `http://localhost:5203/swagger`
 - Bookings: `http://localhost:5075/swagger`
 
-Остановить только API сервисы:
+Остановить контейнеры:
 
 ```powershell
-.\scripts\stop-dev.ps1
-```
-
-Остановить API сервисы и Docker-инфраструктуру:
-
-```powershell
-.\scripts\stop-dev.ps1 -WithDocker
+docker compose down
 ```
 
 ## Авторизация в Swagger
@@ -96,11 +113,11 @@ Swagger:
 
 ## Ручной запуск без скрипта
 
-Если нужно запустить по шагам:
+Если нужно отлаживать API из IDE или через `dotnet run`, поднимите через Docker только инфраструктуру:
 
 ```powershell
 cd C:\Users\mariya.zhmakina\Work\EventManager\docker
-docker compose up -d
+docker compose up -d users-db events-db bookings-db redis kafka
 ```
 
 В отдельных терминалах:

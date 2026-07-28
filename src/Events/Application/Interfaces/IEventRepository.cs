@@ -39,4 +39,11 @@ public interface IEventRepository
     /// Проверить, существует ли событие с данным идентификатором
     /// </summary>
     Task<bool> HasEventAsync(Guid id);
+
+    /// <summary>
+    /// Получить самые популярные события по проценту проданных мест.
+    /// </summary>
+    /// <param name="count">Максимальное количество событий.</param>
+    /// <returns>Список популярных событий.</returns>
+    Task<List<EventEntity>?> GetTopEventsAsync(int count);
 }
