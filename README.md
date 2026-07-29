@@ -81,7 +81,8 @@ docker compose up --build
 - `Events`;
 - `Bookings`;
 - `users-db`, `events-db`, `bookings-db`;
-- `Kafka`, `Zookeeper`, `Redis`.
+- `Kafka`, `Zookeeper`, `Redis`;
+- `Prometheus`, `Jaeger`, `Grafana`.
 
 По умолчанию используется development-сборка из общего `docker/Dockerfile`. Для production-сборки без скриптов можно переключить Docker target и окружение:
 
@@ -97,6 +98,41 @@ Swagger:
 - Users/Auth: `http://localhost:5202/swagger`
 - Events: `http://localhost:5203/swagger`
 - Bookings: `http://localhost:5075/swagger`
+
+## Наблюдаемость
+
+В сервисы `Users`, `Events` и `Bookings` добавлена наблюдаемость через OpenTelemetry и Serilog:
+
+- OpenTelemetry собирает трейсы входящих HTTP-запросов, исходящих HTTP-запросов и EF Core-запросов;
+- OpenTelemetry собирает метрики ASP.NET Core и runtime-метрики .NET;
+- трейсы экспортируются в Jaeger через OTLP;
+- метрики доступны для Prometheus на endpoint `/metrics`;
+- Serilog пишет структурированные JSON-логи в консоль через `CompactJsonFormatter`.
+
+Стек мониторинга поднимается вместе с приложением из папки `docker`:
+
+```powershell
+cd C:\Users\mariya.zhmakina\Work\EventManager\docker
+docker compose up --build
+```
+
+UI инструментов:
+
+| Инструмент | URL | Назначение |
+| --- | --- | --- |
+| Prometheus | `http://localhost:9090` | Проверка targets и PromQL-запросы к метрикам |
+| Jaeger | `http://localhost:16686` | Просмотр distributed traces |
+| Grafana | `http://localhost:3000` | Дашборды по метрикам, логин `admin`, пароль `admin` |
+
+Prometheus читает конфигурацию из `docker/prometheus.yml` и скрейпит API-сервисы внутри Docker-сети:
+
+- `events-api:8080/metrics`;
+- `bookings-api:8080/metrics`;
+- `users-api:8080/metrics`.
+
+В Docker Compose для API-сервисов задан `Otlp__Endpoint=http://jaeger:4317`, а для локального запуска значение по умолчанию хранится в `appsettings.json` каждого сервиса: `Otlp:Endpoint=http://localhost:4317`. Имена сервисов для Jaeger и Prometheus вынесены в `Service:Name`.
+
+В Grafana добавляется источник данных Prometheus с адресом `http://prometheus:9090`. Экспортированный JSON дашборда находится в `docker/grafana-dashboards/app-technical-metrics.json`; в нем есть панели latency p50/p95/p99, active requests и throughput RPS.
 
 Остановить контейнеры:
 
